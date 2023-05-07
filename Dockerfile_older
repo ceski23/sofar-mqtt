@@ -1,0 +1,13 @@
+# FROM clux/muslrust:1.69.0 AS builder
+# COPY Cargo.* .
+# COPY src src
+# RUN rustup target add aarch64-unknown-linux-musl
+# RUN --mount=type=cache,target=/volume/target \
+#     --mount=type=cache,target=/root/.cargo/registry \
+#     cargo build --release --target aarch64-unknown-linux-musl --bin sofar-mqtt && \
+#     mv /volume/target/aarch64-unknown-linux-musl/release/sofar-mqtt .
+
+# FROM gcr.io/distroless/static:nonroot
+# COPY --from=builder --chown=nonroot:nonroot /volume/sofar-mqtt /app/
+# EXPOSE 8080
+# ENTRYPOINT ["/app/sofar-mqtt"]

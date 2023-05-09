@@ -1,0 +1,86 @@
+use crate::{
+    config::Config,
+    discovery::{Device, Entity},
+};
+use rumqttc::{AsyncClient, EventLoop, MqttOptions, QoS};
+use serde_json::Value;
+use std::error::Error;
+
+pub struct MqttPublisher {
+    pub mqtt_client: AsyncClient,
+    event_loop: EventLoop,
+    prefix: String,
+}
+
+impl MqttPublisher {
+    pub(crate) fn new(prefix: String) -> Self {
+        let config = serde_env::from_env::<Config>().unwrap();
+        let mut mqttoptions = MqttOptions::new("sofar-mqtt", config.mqtt_host, config.mqtt_port);
+
+        if config.mqtt_user.is_some() && config.mqtt_password.is_some() {
+            mqttoptions.set_credentials(config.mqtt_user.unwrap(), config.mqtt_password.unwrap());
+        }
+
+        let (mqtt_client, event_loop) = AsyncClient::new(mqttoptions.to_owned(), 10);
+
+        MqttPublisher {
+            mqtt_client,
+            event_loop,
+            prefix,
+        }
+    }
+
+    pub async fn publish_state(
+        &mut self,
+        key: &String,
+        value: &Value,
+    ) -> Result<(), Box<dyn Error>> {
+        let state_payload = match value {
+            Value::String(a) => a.trim().to_owned(),
+            a => a.to_string(),
+        };
+
+        self.mqtt_client
+            .publish(
+                format!("{}/{}", self.prefix, key),
+                QoS::AtMostOnce,
+                false,
+                state_payload,
+            )
+            .await?;
+
+        Ok(self.event_loop.poll().await.map(|_| ())?)
+    }
+
+    pub async fn pubish_discovery(&mut self, key: &String) -> Result<(), Box<dyn Error>> {
+        let payload = self.prepare_discovery_payload(key);
+
+        self.mqtt_client
+            .publish(
+                format!("homeassistant/sensor/sofar/{key}/config"),
+                QoS::AtMostOnce,
+                false,
+                serde_json::to_string(&payload)?,
+            )
+            .await?;
+
+        Ok(self.event_loop.poll().await.map(|_| ())?)
+    }
+
+    pub(crate) fn prepare_discovery_payload(&mut self, key: &str) -> Entity {
+        let device = Device::default();
+
+        match key {
+            "current_power" => {
+                Entity::power_sensor(key.to_string(), self.prefix.to_owned(), device)
+            }
+            "inverter_temperature" => {
+                Entity::new_temperature_entity(key.to_string(), self.prefix.to_owned(), device)
+            }
+            "daily_energy" | "total_energy" => {
+                Entity::energy_sensor(key.to_string(), self.prefix.to_owned(), device)
+            }
+            _ => Entity::generic_sensor(key.to_string(), self.prefix.to_owned(), device),
+        }
+    }
+}

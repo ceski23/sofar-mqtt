@@ -9,14 +9,11 @@ mod config;
 mod discovery;
 mod helpers;
 mod models;
+mod publisher;
 
-use crate::{
-    codec::SofarCodec,
-    config::Config,
-    discovery::{Device, Entity},
-};
+use crate::{codec::SofarCodec, config::Config, publisher::MqttPublisher};
 use futures_util::StreamExt;
-use rumqttc::{AsyncClient, MqttOptions, QoS};
+use rumqttc::MqttOptions;
 use serde_json::{Map, Value};
 use std::error::Error;
 use tokio::{
@@ -74,55 +71,30 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                 let map =
                     serde_json::from_value::<Map<String, Value>>(serde_json::to_value(&data)?)?;
 
-                let (mqtt_client, mut eventloop) = AsyncClient::new(mqttoptions.to_owned(), 10);
+                let mut publisher = MqttPublisher::new("sofar".to_string());
 
                 log::info!("Sending data to MQTT broker");
 
                 for (key, value) in map.iter() {
-                    let prefix = "sofar".to_string();
-
-                    let state_payload = match value {
-                        Value::String(a) => a.trim().to_owned(),
-                        a => a.to_string(),
-                    };
-
-                    mqtt_client
-                        .publish(
-                            format!("{prefix}/{key}"),
-                            QoS::AtMostOnce,
-                            false,
-                            state_payload,
-                        )
-                        .await?;
-
-                    match eventloop.poll().await {
+                    match publisher.publish_state(key, value).await {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Error sending data to MQTT broker ({:?})", err);
-                            return Err(Box::new(err));
+                            return Err(err);
                         }
                     }
 
-                    mqtt_client
-                        .publish(
-                            format!("homeassistant/sensor/sofar/{key}/config"),
-                            QoS::AtMostOnce,
-                            false,
-                            serde_json::to_string(&prepare_discovery_payload(key, prefix))?,
-                        )
-                        .await?;
-
-                    match eventloop.poll().await {
+                    match publisher.pubish_discovery(key).await {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Error sending data to MQTT broker ({:?})", err);
-                            return Err(Box::new(err));
+                            return Err(err);
                         }
                     }
                 }
 
                 log::info!("Disconnecting from MQTT broker");
-                mqtt_client.disconnect().await?
+                publisher.mqtt_client.disconnect().await?;
             }
             _ => {}
         }
@@ -130,15 +102,4 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
 
     log::info!("Finishing TCP connection");
     Ok(())
-}
-
-fn prepare_discovery_payload(key: &str, prefix: String) -> Entity {
-    let device = Device::default();
-
-    match key {
-        "current_power" => Entity::power_sensor(key.to_string(), prefix, device),
-        "inverter_temperature" => Entity::new_temperature_entity(key.to_string(), prefix, device),
-        "daily_energy" | "total_energy" => Entity::energy_sensor(key.to_string(), prefix, device),
-        _ => Entity::generic_sensor(key.to_string(), prefix, device),
-    }
 }

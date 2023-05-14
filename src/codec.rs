@@ -1,10 +1,15 @@
+use crate::models::MessageData;
 use crate::models::MessageType;
+use crate::models::ResponseData;
 use crate::models::SofarMessage;
+use crate::models::SofarResponseMessage;
 use bytes::Buf;
+use bytes::BufMut;
 use bytes::BytesMut;
 use num_traits::FromPrimitive;
 use std::io::Cursor;
 use tokio_util::codec::Decoder;
+use tokio_util::codec::Encoder;
 
 pub struct SofarCodec;
 
@@ -42,12 +47,9 @@ impl Decoder for SofarCodec {
             return Ok(None);
         }
 
-        let calculated_checksum = &buf
-            [1..header_data_length + message_length + footer_data_length - 2]
-            .iter()
-            .copied()
-            .reduce(|a, b| a.wrapping_add(b))
-            .unwrap_or(0);
+        let calculated_checksum: u8 =
+            calc_checksum(&buf[1..header_data_length + message_length + footer_data_length - 2])
+                .unwrap_or(0);
 
         log::debug!("Calculating checksum: {:?}", calculated_checksum);
 
@@ -56,26 +58,28 @@ impl Decoder for SofarCodec {
         // swallow message length
         buf.get_u16_le();
 
-        // TODO: handle unknown message type
-        let message_type = MessageType::from_u16(buf.get_u16_le()).unwrap();
-        log::info!("Got message type: {:?}", message_type);
+        let message_type = MessageType::from_u16(buf.get_u16_le()).ok_or(bincode::Error::new(
+            bincode::ErrorKind::Custom("Unknown message type".to_string()),
+        ))?;
+        log::info!("Decoded message type: {:?}", message_type);
+
+        let message_number = buf.get_u8();
 
         // swallow rest of header
-        buf.get_u16();
-        buf.get_u32();
+        buf.get_u8();
 
-        let message = match message_type {
-            MessageType::Heartbeat => {
-                Some(SofarMessage::Heartbeat(bincode::deserialize(&buf).unwrap()))
-            }
-            MessageType::Data => Some(SofarMessage::Data(bincode::deserialize(&buf).unwrap())),
-        };
+        let data_logger_sn = buf.get_u32_le();
+
+        let data = match message_type {
+            MessageType::Heartbeat => bincode::deserialize(&buf).map(MessageData::Heartbeat),
+            MessageType::Data => bincode::deserialize(&buf).map(MessageData::Data),
+        }?;
 
         buf.advance(message_length);
 
         let checksum = buf.get_u8();
 
-        if checksum != *calculated_checksum {
+        if checksum != calculated_checksum {
             return Err(bincode::Error::new(bincode::ErrorKind::Custom(
                 "Invalid checksum".to_string(),
             )));
@@ -84,7 +88,41 @@ impl Decoder for SofarCodec {
         // swallow last byte
         buf.get_u8();
 
-        Ok(message)
+        return Ok(Some(SofarMessage {
+            data,
+            message_type,
+            message_number,
+            data_logger_sn,
+        }));
+    }
+}
+
+impl Encoder<SofarResponseMessage> for SofarCodec {
+    type Error = bincode::Error;
+
+    fn encode(
+        &mut self,
+        item: SofarResponseMessage,
+        buf: &mut BytesMut,
+    ) -> Result<(), Self::Error> {
+        let data = match item.data {
+            ResponseData::ServerResponse(data) => bincode::serialize(&data),
+        }?;
+        let response_type = get_response_type(item.request_type);
+
+        buf.put_u8(0xa5);
+        buf.put_u16_le(u16::try_from(data.len()).unwrap());
+        buf.put_u16_le(response_type);
+        buf.put_u8(item.request_message_number + 1);
+        buf.put_u8(item.request_message_number);
+        buf.put_u32_le(item.data_logger_sn);
+        buf.extend(data);
+
+        let checksum = calc_checksum(&buf[1..]).unwrap();
+        buf.put_u8(checksum);
+        buf.put_u8(0x15);
+
+        Ok(())
     }
 }
 
@@ -92,4 +130,15 @@ impl Default for SofarCodec {
     fn default() -> Self {
         SofarCodec {}
     }
+}
+
+fn get_response_type(request_type: MessageType) -> u16 {
+    match request_type {
+        MessageType::Data => 0x1210,
+        MessageType::Heartbeat => 0x1710,
+    }
+}
+
+fn calc_checksum(buf: &[u8]) -> Option<u8> {
+    buf.iter().copied().reduce(|a, b| a.wrapping_add(b))
 }

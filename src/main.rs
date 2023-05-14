@@ -11,8 +11,13 @@ mod helpers;
 mod models;
 mod publisher;
 
-use crate::{codec::SofarCodec, config::Config, publisher::MqttPublisher};
-use futures_util::StreamExt;
+use crate::{
+    codec::SofarCodec,
+    config::Config,
+    models::{MessageData, ResponseData, ServerResponse, SofarResponseMessage},
+    publisher::MqttPublisher,
+};
+use futures_util::{SinkExt, StreamExt};
 use rumqttc::MqttOptions;
 use serde_json::{Map, Value};
 use std::error::Error;
@@ -66,37 +71,59 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
         log::info!("Received frame");
         match frame {
             Err(err) => log::error!("Error while reading frame ({:#?})", err),
-            Ok(models::SofarMessage::Data(data)) => {
-                log::info!("Preparing data for MQTT broker");
-                let map =
-                    serde_json::from_value::<Map<String, Value>>(serde_json::to_value(&data)?)?;
+            Ok(message) => match message.data {
+                MessageData::Data(data) => {
+                    let response_message = SofarResponseMessage {
+                        data: ResponseData::ServerResponse(ServerResponse::new(data._sth0)),
+                        request_type: message.message_type,
+                        request_message_number: message.message_number,
+                        data_logger_sn: message.data_logger_sn,
+                    };
 
-                let mut publisher = MqttPublisher::new("sofar".to_string());
+                    log::info!("Responding with {:?}", response_message);
+                    framed_stream.send(response_message).await?;
 
-                log::info!("Sending data to MQTT broker");
+                    log::info!("Preparing data for MQTT broker");
+                    let map =
+                        serde_json::from_value::<Map<String, Value>>(serde_json::to_value(&data)?)?;
 
-                for (key, value) in map.iter() {
-                    match publisher.publish_state(key, value).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            log::error!("Error sending data to MQTT broker ({:?})", err);
-                            return Err(err);
+                    let mut publisher = MqttPublisher::new("sofar".to_string());
+
+                    log::info!("Sending data to MQTT broker");
+
+                    for (key, value) in map.iter() {
+                        match publisher.publish_state(key, value).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                log::error!("Error sending data to MQTT broker ({:?})", err);
+                                break;
+                            }
+                        }
+
+                        match publisher.pubish_discovery(key).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                log::error!("Error sending data to MQTT broker ({:?})", err);
+                                break;
+                            }
                         }
                     }
 
-                    match publisher.pubish_discovery(key).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            log::error!("Error sending data to MQTT broker ({:?})", err);
-                            return Err(err);
-                        }
-                    }
+                    log::info!("Disconnecting from MQTT broker");
+                    publisher.mqtt_client.disconnect().await?;
                 }
+                MessageData::Heartbeat(data) => {
+                    let response_message = SofarResponseMessage {
+                        data: ResponseData::ServerResponse(ServerResponse::new(data.zero)),
+                        request_type: message.message_type,
+                        request_message_number: message.message_number,
+                        data_logger_sn: message.data_logger_sn,
+                    };
 
-                log::info!("Disconnecting from MQTT broker");
-                publisher.mqtt_client.disconnect().await?;
-            }
-            _ => {}
+                    log::info!("Responding with {:?}", response_message);
+                    framed_stream.send(response_message).await?;
+                }
+            },
         }
     }
 

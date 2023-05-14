@@ -49,7 +49,8 @@ impl MqttPublisher {
             )
             .await?;
 
-        Ok(self.event_loop.poll().await.map(|_| ())?)
+        self.event_loop.poll().await?;
+        Ok(())
     }
 
     pub async fn pubish_discovery(&mut self, key: &String) -> Result<(), Box<dyn Error>> {
@@ -64,7 +65,8 @@ impl MqttPublisher {
             )
             .await?;
 
-        Ok(self.event_loop.poll().await.map(|_| ())?)
+        self.event_loop.poll().await?;
+        Ok(())
     }
 
     pub(crate) fn prepare_discovery_payload(&mut self, key: &str) -> Entity {

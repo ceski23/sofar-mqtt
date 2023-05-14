@@ -15,20 +15,33 @@ async def tcp_echo_client():
         48, 86, 50, 56, 48, 23, 5, 3, 18, 14, 19, 15, 0, 0, 0, 239, 21,
     ])
 
+
+
+    print(f"sending {list(hearbeat)}")
     writer.write(hearbeat)
     await writer.drain()
-    await asyncio.sleep(2)
+
+    print('Waiting for response')
+    res = await reader.read(23)
+    print(f"Reading: {list(res)}")
+
+
 
     step = 100
     for i in range(0, len(data), step):
         d = data[i:i+step]
-        print(f"sending {d}")
+        print(f"sending {list(d)}")
         writer.write(d)
         await writer.drain()
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.005)
 
-    print('Close the connection')
+    print('Waiting for response')
+    res = await reader.read(23)
+    print(f"Reading: {list(res)}")
+
+
     writer.close()
     await writer.wait_closed()
+    print('Closed connection')
 
 asyncio.run(tcp_echo_client())

@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::helpers::{divide_i16_by, divide_u16_by, divide_u32_by, parse_string};
 
 #[derive(Primitive, Debug)]
@@ -7,26 +9,47 @@ pub enum MessageType {
 }
 
 #[allow(dead_code)]
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Serialize, Debug)]
 pub struct ServerResponse {
-    sth: u8,
+    // always matches request
+    message_id: u8,
     one: u8,
-    timestamp: u32,
+    pub timestamp: u32,
     sth2: u16,
     zero: u16,
+}
+
+impl ServerResponse {
+    pub(crate) fn new(message_id: u8) -> Self {
+        let timestamp = u32::try_from(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+        )
+        .unwrap_or_default();
+
+        ServerResponse {
+            message_id,
+            one: 1,
+            timestamp,
+            sth2: 0x7800,
+            zero: 0,
+        }
+    }
 }
 
 #[allow(dead_code)]
 #[derive(serde::Deserialize, Debug)]
 pub struct Heartbeat {
-    zero: u8,
+    pub zero: u8,
 }
 
 #[allow(dead_code)]
 #[derive(serde::Deserialize, Debug, serde::Serialize)]
 pub struct Data {
     #[serde(skip_serializing)]
-    _sth0: u8,
+    pub _sth0: u8,
     sensor_type_list: u16,
     total_operation_time: u32,
     timer: u32,
@@ -117,8 +140,58 @@ pub struct Data {
     _sth5: u32,
 }
 
+#[allow(dead_code)]
+#[derive(serde::Deserialize, Debug)]
+pub struct Hello {
+    #[serde(skip_serializing)]
+    one: u8,
+    total_operation_time: u32,
+    timer: u32,
+    #[serde(skip_serializing)]
+    zero: u16,
+    uploading_frequency: u8,
+    data_logging_frequency: u8,
+    hearbeat_frequency: u8,
+    max_num_of_connected_devices: u8,
+    signal_quality: u8,
+    sensor_type: u8,
+    #[serde(deserialize_with = "parse_string::<_, 39>")]
+    module_version: String,
+    #[serde(deserialize_with = "parse_string::<_, 6>")]
+    sta_mac_address: String,
+    #[serde(deserialize_with = "parse_string::<_, 15>")]
+    local_ip_address: String,
+    #[serde(skip_serializing)]
+    zero2: u16,
+    #[serde(skip_serializing)]
+    one2: u16,
+    sensor_type_list: u16,
+}
+
 #[derive(Debug)]
-pub enum SofarMessage {
+pub enum MessageData {
     Heartbeat(Heartbeat),
     Data(Data),
+    // Hello(Hello),
+}
+
+#[derive(Debug)]
+pub struct SofarMessage {
+    pub data: MessageData,
+    pub message_type: MessageType,
+    pub message_number: u8,
+    pub data_logger_sn: u32,
+}
+
+#[derive(Debug)]
+pub enum ResponseData {
+    ServerResponse(ServerResponse),
+}
+
+#[derive(Debug)]
+pub struct SofarResponseMessage {
+    pub data: ResponseData,
+    pub request_type: MessageType,
+    pub request_message_number: u8,
+    pub data_logger_sn: u32,
 }

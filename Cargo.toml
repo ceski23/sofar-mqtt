@@ -11,6 +11,7 @@ enum-primitive-derive = "0.2.2"
 env_logger = "0.10.0"
 futures-util = "0.3.28"
 log = "0.4.17"
+macaddr = { version = "1.0.1", features = ["serde_std"] }
 num-traits = "0.2.15"
 rumqttc = "0.21.0"
 serde = { version = "1.0.160", features = ["derive"] }

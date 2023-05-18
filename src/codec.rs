@@ -73,6 +73,7 @@ impl Decoder for SofarCodec {
         let data = match message_type {
             MessageType::Heartbeat => bincode::deserialize(&buf).map(MessageData::Heartbeat),
             MessageType::Data => bincode::deserialize(&buf).map(MessageData::Data),
+            MessageType::Hello => bincode::deserialize(&buf).map(MessageData::Hello),
         }?;
 
         buf.advance(message_length);
@@ -136,6 +137,7 @@ fn get_response_type(request_type: MessageType) -> u16 {
     match request_type {
         MessageType::Data => 0x1210,
         MessageType::Heartbeat => 0x1710,
+        MessageType::Hello => 0x1110,
     }
 }
 

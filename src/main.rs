@@ -123,6 +123,19 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                     log::info!("Responding with {:?}", response_message);
                     framed_stream.send(response_message).await?;
                 }
+                MessageData::Hello(hello) => {
+                    log::debug!("{:#?}", hello);
+
+                    let response_message = SofarResponseMessage {
+                        data: ResponseData::ServerResponse(ServerResponse::new(hello.one)),
+                        request_type: message.message_type,
+                        request_message_number: message.message_number,
+                        data_logger_sn: message.data_logger_sn,
+                    };
+
+                    log::info!("Responding with {:?}", response_message);
+                    framed_stream.send(response_message).await?;
+                }
             },
         }
     }

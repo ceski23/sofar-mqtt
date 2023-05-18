@@ -1,11 +1,12 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use crate::helpers::{divide_i16_by, divide_u16_by, divide_u32_by, parse_string};
+use macaddr::MacAddr6;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Primitive, Debug)]
 pub enum MessageType {
     Heartbeat = 0x4710,
     Data = 0x4210,
+    Hello = 0x4110,
 }
 
 #[allow(dead_code)]
@@ -144,22 +145,21 @@ pub struct Data {
 #[derive(serde::Deserialize, Debug)]
 pub struct Hello {
     #[serde(skip_serializing)]
-    one: u8,
+    pub one: u8,
     total_operation_time: u32,
     timer: u32,
     #[serde(skip_serializing)]
-    zero: u16,
+    zero: u32,
     uploading_frequency: u8,
     data_logging_frequency: u8,
     hearbeat_frequency: u8,
     max_num_of_connected_devices: u8,
     signal_quality: u8,
     sensor_type: u8,
-    #[serde(deserialize_with = "parse_string::<_, 39>")]
+    #[serde(deserialize_with = "parse_string::<_, 40>")]
     module_version: String,
-    #[serde(deserialize_with = "parse_string::<_, 6>")]
-    sta_mac_address: String,
-    #[serde(deserialize_with = "parse_string::<_, 15>")]
+    sta_mac_address: MacAddr6,
+    #[serde(deserialize_with = "parse_string::<_, 16>")]
     local_ip_address: String,
     #[serde(skip_serializing)]
     zero2: u16,
@@ -172,7 +172,7 @@ pub struct Hello {
 pub enum MessageData {
     Heartbeat(Heartbeat),
     Data(Data),
-    // Hello(Hello),
+    Hello(Hello),
 }
 
 #[derive(Debug)]

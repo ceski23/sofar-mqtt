@@ -34,7 +34,7 @@ impl ServerResponse {
             message_id,
             one: 1,
             timestamp,
-            sth2: 0x7800,
+            sth2: 0x0078,
             zero: 0,
         }
     }
@@ -180,6 +180,7 @@ pub struct SofarMessage {
     pub data: MessageData,
     pub message_type: MessageType,
     pub message_number: u8,
+    pub message_number_2: u8,
     pub data_logger_sn: u32,
 }
 
@@ -193,5 +194,6 @@ pub struct SofarResponseMessage {
     pub data: ResponseData,
     pub request_type: MessageType,
     pub request_message_number: u8,
+    pub request_message_number_2: u8,
     pub data_logger_sn: u32,
 }

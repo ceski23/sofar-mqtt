@@ -77,6 +77,7 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                         data: ResponseData::ServerResponse(ServerResponse::new(data._sth0)),
                         request_type: message.message_type,
                         request_message_number: message.message_number,
+                        request_message_number_2: message.message_number_2,
                         data_logger_sn: message.data_logger_sn,
                     };
 
@@ -117,6 +118,7 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                         data: ResponseData::ServerResponse(ServerResponse::new(data.zero)),
                         request_type: message.message_type,
                         request_message_number: message.message_number,
+                        request_message_number_2: message.message_number_2,
                         data_logger_sn: message.data_logger_sn,
                     };
 
@@ -130,6 +132,7 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                         data: ResponseData::ServerResponse(ServerResponse::new(hello.one)),
                         request_type: message.message_type,
                         request_message_number: message.message_number,
+                        request_message_number_2: message.message_number_2,
                         data_logger_sn: message.data_logger_sn,
                     };
 

@@ -64,10 +64,7 @@ impl Decoder for SofarCodec {
         log::info!("Decoded message type: {:?}", message_type);
 
         let message_number = buf.get_u8();
-
-        // swallow rest of header
-        buf.get_u8();
-
+        let message_number_2 = buf.get_u8();
         let data_logger_sn = buf.get_u32_le();
 
         let data = match message_type {
@@ -93,6 +90,7 @@ impl Decoder for SofarCodec {
             data,
             message_type,
             message_number,
+            message_number_2,
             data_logger_sn,
         }));
     }
@@ -115,7 +113,7 @@ impl Encoder<SofarResponseMessage> for SofarCodec {
         buf.put_u16_le(u16::try_from(data.len()).unwrap());
         buf.put_u16_le(response_type);
         buf.put_u8(item.request_message_number + 1);
-        buf.put_u8(item.request_message_number);
+        buf.put_u8(item.request_message_number_2);
         buf.put_u32_le(item.data_logger_sn);
         buf.extend(data);
 

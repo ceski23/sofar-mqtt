@@ -58,8 +58,9 @@ impl Decoder for SofarCodec {
         // swallow message length
         buf.get_u16_le();
 
-        let message_type = MessageType::from_u16(buf.get_u16_le()).ok_or(bincode::Error::new(
-            bincode::ErrorKind::Custom("Unknown message type".to_string()),
+        let message_type_bytes = buf.get_u16_le();
+        let message_type = MessageType::from_u16(message_type_bytes).ok_or(bincode::Error::new(
+            bincode::ErrorKind::Custom(format!("Unknown message type {}", message_type_bytes)),
         ))?;
         log::info!("Decoded message type: {:?}", message_type);
 
@@ -71,6 +72,7 @@ impl Decoder for SofarCodec {
             MessageType::Heartbeat => bincode::deserialize(&buf).map(MessageData::Heartbeat),
             MessageType::Data => bincode::deserialize(&buf).map(MessageData::Data),
             MessageType::Hello => bincode::deserialize(&buf).map(MessageData::Hello),
+            MessageType::HelloCd => bincode::deserialize(&buf).map(MessageData::HelloCd),
         }?;
 
         buf.advance(message_length);
@@ -136,6 +138,7 @@ fn get_response_type(request_type: MessageType) -> u16 {
         MessageType::Data => 0x1210,
         MessageType::Heartbeat => 0x1710,
         MessageType::Hello => 0x1110,
+        MessageType::HelloCd => 0x1810,
     }
 }
 

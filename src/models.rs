@@ -7,6 +7,7 @@ pub enum MessageType {
     Heartbeat = 0x4710,
     Data = 0x4210,
     Hello = 0x4110,
+    HelloCd = 0x4810,
 }
 
 #[allow(dead_code)]
@@ -168,11 +169,60 @@ pub struct Hello {
     sensor_type_list: u16,
 }
 
+#[allow(dead_code)]
+#[derive(serde::Deserialize, Debug)]
+pub struct HelloCd {
+    pub one: u8,
+    total_operation_time: u32,
+    timer: u32,
+    timestamp: u32,
+    one2: u16,
+    sth: u32,
+    zero: u8,
+    sth2: u32,
+    timestamp2: u32,
+}
+
+#[allow(dead_code)]
+#[derive(serde::Deserialize, Debug)]
+pub struct HelloEnd {
+    pub one: u8,
+    total_operation_time: u32,
+    timer: u32,
+    timestamp: u32,
+    sth: u16,
+    sth2: u16,
+    sth3: u16,
+    sth4: u16,
+    sth5: u16,
+    sth6: u16,
+    sth7: u16,
+    sth8: u16,
+    sth9: u16,
+    sth10: u16,
+    sth11: u16,
+    sth12: u16,
+    sth13: u16,
+    sth14: u16,
+    sth15: u16,
+    sth16: u16,
+    sth17: u16,
+    sth18: u16,
+    sth19: u16,
+    sth20: u16,
+    sth21: u16,
+    sth22: u16,
+    sth23: u16,
+    sth24: u8,
+}
+
 #[derive(Debug)]
 pub enum MessageData {
     Heartbeat(Heartbeat),
     Data(Data),
     Hello(Hello),
+    HelloCd(HelloCd),
+    HelloEnd(HelloEnd),
 }
 
 #[derive(Debug)]

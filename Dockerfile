@@ -43,7 +43,7 @@ RUN touch /usr/src/$APP/src/main.rs
 
 # Build real project
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/src/$APP/target \
+    # --mount=type=cache,target=/usr/src/$APP/target \
     cargo build --release --target $TARGET
 
 FROM debian:bullseye-slim AS runtime

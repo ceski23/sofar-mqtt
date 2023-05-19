@@ -73,6 +73,7 @@ impl Decoder for SofarCodec {
             MessageType::Data => bincode::deserialize(&buf).map(MessageData::Data),
             MessageType::Hello => bincode::deserialize(&buf).map(MessageData::Hello),
             MessageType::HelloCd => bincode::deserialize(&buf).map(MessageData::HelloCd),
+            MessageType::Unknown44 => bincode::deserialize(&buf).map(MessageData::Unknown44),
         }?;
 
         buf.advance(message_length);
@@ -139,6 +140,7 @@ fn get_response_type(request_type: MessageType) -> u16 {
         MessageType::Heartbeat => 0x1710,
         MessageType::Hello => 0x1110,
         MessageType::HelloCd => 0x1810,
+        MessageType::Unknown44 => 0x1310,
     }
 }
 

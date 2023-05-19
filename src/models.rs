@@ -8,6 +8,7 @@ pub enum MessageType {
     Data = 0x4210,
     Hello = 0x4110,
     HelloCd = 0x4810,
+    Unknown44 = 0x4310,
 }
 
 #[allow(dead_code)]
@@ -216,6 +217,24 @@ pub struct HelloEnd {
     sth24: u8,
 }
 
+#[allow(dead_code)]
+#[derive(serde::Deserialize, Debug)]
+pub struct Unknown44 {
+    pub _sth1: u8,
+    _sth2: u8,
+    _sth3: u8,
+    _sth4: u8,
+    _sth5: u8,
+    _sth6: u8,
+    _sth7: u8,
+    _sth8: u8,
+    _sth9: u8,
+    timestamp: u32,
+    _sth10: u16,
+    #[serde(deserialize_with = "parse_string::<_, 16>")]
+    wifi_ssid: String,
+}
+
 #[derive(Debug)]
 pub enum MessageData {
     Heartbeat(Heartbeat),
@@ -223,6 +242,7 @@ pub enum MessageData {
     Hello(Hello),
     HelloCd(HelloCd),
     HelloEnd(HelloEnd),
+    Unknown44(Unknown44),
 }
 
 #[derive(Debug)]

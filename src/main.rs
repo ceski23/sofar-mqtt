@@ -14,7 +14,7 @@ mod publisher;
 use crate::{
     codec::SofarCodec,
     config::Config,
-    models::{MessageData, ResponseData, ServerResponse, SofarResponseMessage},
+    models::{MessageData, SofarResponseMessage},
     publisher::MqttPublisher,
 };
 use futures_util::{SinkExt, StreamExt};
@@ -68,120 +68,54 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
     }
 
     while let Some(frame) = framed_stream.next().await {
-        log::info!("Received frame");
         match frame {
             Err(err) => log::error!("Error while reading frame ({:#?})", err),
-            Ok(message) => match message.data {
-                MessageData::Data(data) => {
-                    let response_message = SofarResponseMessage {
-                        data: ResponseData::ServerResponse(ServerResponse::new(data._sth0)),
-                        request_type: message.message_type,
-                        request_message_number: message.message_number,
-                        request_message_number_2: message.message_number_2,
-                        data_logger_sn: message.data_logger_sn,
-                    };
+            Ok(message) => {
+                log::info!("Received frame of type {:?}", message.message_type);
+                let response_message = SofarResponseMessage::new(&message);
 
-                    log::info!("Responding with {:?}", response_message);
-                    framed_stream.send(response_message).await?;
+                match message.data {
+                    MessageData::Data(data) => {
+                        log::info!("{:?}", data);
+                        log::info!("Responding with {:?}", response_message);
+                        framed_stream.send(response_message).await?;
 
-                    log::info!("Preparing data for MQTT broker");
-                    let map =
-                        serde_json::from_value::<Map<String, Value>>(serde_json::to_value(&data)?)?;
+                        log::info!("Preparing data for MQTT broker");
+                        let map = serde_json::from_value::<Map<String, Value>>(
+                            serde_json::to_value(&data)?,
+                        )?;
 
-                    let mut publisher = MqttPublisher::new("sofar".to_string());
+                        let mut publisher = MqttPublisher::new("sofar".to_string());
 
-                    log::info!("Sending data to MQTT broker");
+                        log::info!("Sending data to MQTT broker");
 
-                    for (key, value) in map.iter() {
-                        match publisher.publish_state(key, value).await {
-                            Ok(_) => {}
-                            Err(err) => {
-                                log::error!("Error sending data to MQTT broker ({:?})", err);
-                                break;
+                        for (key, value) in map.iter() {
+                            match publisher.publish_state(key, value).await {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    log::error!("Error sending data to MQTT broker ({:?})", err);
+                                    break;
+                                }
+                            }
+
+                            match publisher.pubish_discovery(key).await {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    log::error!("Error sending data to MQTT broker ({:?})", err);
+                                    break;
+                                }
                             }
                         }
 
-                        match publisher.pubish_discovery(key).await {
-                            Ok(_) => {}
-                            Err(err) => {
-                                log::error!("Error sending data to MQTT broker ({:?})", err);
-                                break;
-                            }
-                        }
+                        log::info!("Disconnecting from MQTT broker");
+                        publisher.mqtt_client.disconnect().await?;
                     }
-
-                    log::info!("Disconnecting from MQTT broker");
-                    publisher.mqtt_client.disconnect().await?;
+                    _ => {
+                        log::info!("Responding with {:?}", response_message);
+                        framed_stream.send(response_message).await?;
+                    }
                 }
-                MessageData::Heartbeat(data) => {
-                    let response_message = SofarResponseMessage {
-                        data: ResponseData::ServerResponse(ServerResponse::new(data.zero)),
-                        request_type: message.message_type,
-                        request_message_number: message.message_number,
-                        request_message_number_2: message.message_number_2,
-                        data_logger_sn: message.data_logger_sn,
-                    };
-
-                    log::info!("Responding with {:?}", response_message);
-                    framed_stream.send(response_message).await?;
-                }
-                MessageData::Hello(hello) => {
-                    log::debug!("{:#?}", hello);
-
-                    let response_message = SofarResponseMessage {
-                        data: ResponseData::ServerResponse(ServerResponse::new(hello.one)),
-                        request_type: message.message_type,
-                        request_message_number: message.message_number,
-                        request_message_number_2: message.message_number_2,
-                        data_logger_sn: message.data_logger_sn,
-                    };
-
-                    log::info!("Responding with {:?}", response_message);
-                    framed_stream.send(response_message).await?;
-                }
-                MessageData::HelloCd(hello) => {
-                    log::debug!("{:#?}", hello);
-
-                    let response_message = SofarResponseMessage {
-                        data: ResponseData::ServerResponse(ServerResponse::new(hello.one)),
-                        request_type: message.message_type,
-                        request_message_number: message.message_number,
-                        request_message_number_2: message.message_number_2,
-                        data_logger_sn: message.data_logger_sn,
-                    };
-
-                    log::info!("Responding with {:?}", response_message);
-                    framed_stream.send(response_message).await?;
-                }
-                MessageData::HelloEnd(hello) => {
-                    log::debug!("{:#?}", hello);
-
-                    let response_message = SofarResponseMessage {
-                        data: ResponseData::ServerResponse(ServerResponse::new(hello.one)),
-                        request_type: message.message_type,
-                        request_message_number: message.message_number,
-                        request_message_number_2: message.message_number_2,
-                        data_logger_sn: message.data_logger_sn,
-                    };
-
-                    log::info!("Responding with {:?}", response_message);
-                    framed_stream.send(response_message).await?;
-                }
-                MessageData::Unknown44(data) => {
-                    log::debug!("{:#?}", data);
-
-                    let response_message = SofarResponseMessage {
-                        data: ResponseData::ServerResponse(ServerResponse::new(data._sth1)),
-                        request_type: message.message_type,
-                        request_message_number: message.message_number,
-                        request_message_number_2: message.message_number_2,
-                        data_logger_sn: message.data_logger_sn,
-                    };
-
-                    log::info!("Responding with {:?}", response_message);
-                    framed_stream.send(response_message).await?;
-                }
-            },
+            }
         }
     }
 

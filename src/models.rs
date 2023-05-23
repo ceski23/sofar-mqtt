@@ -2,7 +2,7 @@ use crate::helpers::{divide_i16_by, divide_u16_by, divide_u32_by, parse_string};
 use macaddr::MacAddr6;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Primitive, Debug)]
+#[derive(Primitive, Debug, Clone, Copy)]
 pub enum MessageType {
     Heartbeat = 0x4710,
     Data = 0x4210,
@@ -266,4 +266,25 @@ pub struct SofarResponseMessage {
     pub request_message_number: u8,
     pub request_message_number_2: u8,
     pub data_logger_sn: u32,
+}
+
+impl SofarResponseMessage {
+    pub fn new(request: &SofarMessage) -> Self {
+        let message_id = match &request.data {
+            MessageData::Heartbeat(data) => data.zero,
+            MessageData::Data(data) => data._sth0,
+            MessageData::Hello(data) => data.one,
+            MessageData::HelloCd(data) => data.one,
+            MessageData::HelloEnd(data) => data.one,
+            MessageData::Unknown44(data) => data._sth1,
+        };
+
+        SofarResponseMessage {
+            data: ResponseData::ServerResponse(ServerResponse::new(message_id)),
+            request_type: request.message_type,
+            request_message_number: request.message_number,
+            request_message_number_2: request.message_number_2,
+            data_logger_sn: request.data_logger_sn,
+        }
+    }
 }

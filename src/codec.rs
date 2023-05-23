@@ -62,7 +62,7 @@ impl Decoder for SofarCodec {
         let message_type = MessageType::from_u16(message_type_bytes).ok_or(bincode::Error::new(
             bincode::ErrorKind::Custom(format!("Unknown message type {}", message_type_bytes)),
         ))?;
-        log::info!("Decoded message type: {:?}", message_type);
+        log::debug!("Decoded message type: {:?}", message_type);
 
         let message_number = buf.get_u8();
         let message_number_2 = buf.get_u8();

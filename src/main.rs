@@ -18,7 +18,6 @@ use crate::{
     publisher::MqttPublisher,
 };
 use futures_util::{SinkExt, StreamExt};
-use rumqttc::MqttOptions;
 use serde_json::{Map, Value};
 use std::error::Error;
 use tokio::{
@@ -59,13 +58,7 @@ async fn main() -> io::Result<()> {
 }
 
 async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
-    let config = serde_env::from_env::<Config>()?;
     let mut framed_stream = Framed::new(stream, SofarCodec::default());
-
-    let mut mqttoptions = MqttOptions::new("sofar-mqtt", config.mqtt_host, config.mqtt_port);
-    if config.mqtt_user.is_some() && config.mqtt_password.is_some() {
-        mqttoptions.set_credentials(config.mqtt_user.unwrap(), config.mqtt_password.unwrap());
-    }
 
     while let Some(frame) = framed_stream.next().await {
         match frame {
@@ -110,7 +103,8 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                         log::info!("Disconnecting from MQTT broker");
                         publisher.mqtt_client.disconnect().await?;
                     }
-                    _ => {
+                    data => {
+                        log::info!("Decoded: {:?}", data);
                         log::info!("Responding with {:?}", response_message);
                         framed_stream.send(response_message).await?;
                     }

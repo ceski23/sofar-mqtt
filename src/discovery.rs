@@ -87,7 +87,7 @@ impl Entity {
             qos: 0,
             state_topic: format!("{prefix}/{name}"),
             device_class: None,
-            state_class: None,
+            state_class: Some("measurement".to_string()),
             unit_of_measurement: None,
         }
     }

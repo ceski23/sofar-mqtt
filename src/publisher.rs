@@ -76,7 +76,7 @@ impl MqttPublisher {
             "current_power" => {
                 Entity::power_sensor(key.to_string(), self.prefix.to_owned(), device)
             }
-            "inverter_temperature" => {
+            "inventer_temperature" | "logger_temperature" => {
                 Entity::new_temperature_entity(key.to_string(), self.prefix.to_owned(), device)
             }
             "daily_energy" | "total_energy" => {

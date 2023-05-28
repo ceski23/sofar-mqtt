@@ -6,15 +6,16 @@ extern crate num_traits;
 
 mod codec;
 mod config;
-mod discovery;
 mod helpers;
+mod homeassistant;
 mod models;
 mod publisher;
 
 use crate::{
     codec::SofarCodec,
     config::Config,
-    models::{MessageData, SofarResponseMessage},
+    homeassistant::{Attributes, Device},
+    models::{MessageData, SensorsData, SofarResponseMessage},
     publisher::MqttPublisher,
 };
 use futures_util::{SinkExt, StreamExt};
@@ -58,6 +59,8 @@ async fn main() -> io::Result<()> {
 }
 
 async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
+    let mut inverter_ip: Option<String> = None;
+    let mut module_version: Option<String> = None;
     let mut framed_stream = Framed::new(stream, SofarCodec::default());
 
     while let Some(frame) = framed_stream.next().await {
@@ -73,17 +76,75 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                         log::info!("Responding with {:?}", response_message);
                         framed_stream.send(response_message).await?;
 
-                        log::info!("Preparing data for MQTT broker");
-                        let map = serde_json::from_value::<Map<String, Value>>(
-                            serde_json::to_value(&data)?,
-                        )?;
+                        let device = Device {
+                            configuration_url: inverter_ip
+                                .clone()
+                                .map(|ip| format!("http://{}/index_cn.html", ip)),
+                            identifiers: format!(
+                                "sofar_{}",
+                                &data.inverter_serial_number.trim().to_lowercase()
+                            ),
+                            manufacturer: String::from("Sofar"),
+                            model: format!("{}", &data.inverter_serial_number.trim()),
+                            name: format!("Sofar {}", &data.inverter_serial_number.trim()),
+                            sw_version: module_version.to_owned(),
+                        };
 
-                        let mut publisher = MqttPublisher::new("sofar".to_string());
+                        let attributes = Attributes {
+                            country_code: data.country_code,
+                            day: data.day,
+                            hardware_version: format!("{}", data.hardware_version),
+                            hour: data.hour,
+                            inverter_firmware: format!("{}", data.inverter_firmware),
+                            main_inverter_firmware: format!("{}", data.main_inverter_firmware),
+                            minute: data.minute,
+                            month: data.month,
+                            second: data.second,
+                            slave_inverter_firmware: format!("{}", data.slave_inverter_firmware),
+                            timestamp: data.timestamp,
+                            total_time: data.total_time,
+                            year: data.year,
+                        };
+
+                        let mut publisher = MqttPublisher::new(format!(
+                            "sofar_{}",
+                            &data.inverter_serial_number.trim().to_lowercase()
+                        ));
 
                         log::info!("Sending data to MQTT broker");
+                        log::info!("Sending attributes ({:?})", attributes);
 
-                        for (key, value) in map.iter() {
-                            match publisher.publish_state(key, value).await {
+                        match publisher
+                            .publish_state(
+                                format!("attributes"),
+                                &serde_json::to_value(&attributes)?,
+                            )
+                            .await
+                        {
+                            Ok(_) => {}
+                            Err(err) => {
+                                log::error!("Error sending data to MQTT broker ({:?})", err);
+                                break;
+                            }
+                        }
+
+                        let sensors_data = SensorsData {
+                            current_power: data.current_power,
+                            daily_energy: data.daily_energy,
+                            inventer_temperature: data.inventer_temperature,
+                            inverter_status: data.inverter_status,
+                            total_energy: data.total_energy,
+                        };
+
+                        log::info!("Sending data ({:?})", sensors_data);
+
+                        for (key, value) in serde_json::from_value::<Map<String, Value>>(
+                            serde_json::to_value(&sensors_data)?,
+                        )? {
+                            match publisher
+                                .publish_state(format!("state/{key}"), &value)
+                                .await
+                            {
                                 Ok(_) => {}
                                 Err(err) => {
                                     log::error!("Error sending data to MQTT broker ({:?})", err);
@@ -91,7 +152,7 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                                 }
                             }
 
-                            match publisher.pubish_discovery(key).await {
+                            match publisher.pubish_discovery(key.to_owned(), &device).await {
                                 Ok(_) => {}
                                 Err(err) => {
                                     log::error!("Error sending data to MQTT broker ({:?})", err);
@@ -102,6 +163,20 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
 
                         log::info!("Disconnecting from MQTT broker");
                         publisher.mqtt_client.disconnect().await?;
+                    }
+                    MessageData::Hello(data) => {
+                        log::info!("Decoded: {:?}", data);
+
+                        inverter_ip = Some(
+                            data.local_ip_address
+                                .trim_matches(char::from(0))
+                                .to_string(),
+                        );
+                        module_version =
+                            Some(data.module_version.trim_matches(char::from(0)).to_string());
+
+                        log::info!("Responding with {:?}", response_message);
+                        framed_stream.send(response_message).await?;
                     }
                     data => {
                         log::info!("Decoded: {:?}", data);

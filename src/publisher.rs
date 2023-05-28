@@ -1,6 +1,6 @@
 use crate::{
     config::Config,
-    discovery::{Device, Entity},
+    homeassistant::{Device, Entity},
 };
 use rumqttc::{AsyncClient, EventLoop, MqttOptions, QoS};
 use serde_json::Value;
@@ -32,7 +32,7 @@ impl MqttPublisher {
 
     pub async fn publish_state(
         &mut self,
-        key: &String,
+        key: String,
         value: &Value,
     ) -> Result<(), Box<dyn Error>> {
         let state_payload = match value {
@@ -53,12 +53,16 @@ impl MqttPublisher {
         Ok(())
     }
 
-    pub async fn pubish_discovery(&mut self, key: &String) -> Result<(), Box<dyn Error>> {
-        let payload = self.prepare_discovery_payload(key);
+    pub async fn pubish_discovery(
+        &mut self,
+        key: String,
+        device: &Device,
+    ) -> Result<(), Box<dyn Error>> {
+        let payload = self.prepare_discovery_payload(key.as_str(), device);
 
         self.mqtt_client
             .publish(
-                format!("homeassistant/sensor/sofar/{key}/config"),
+                format!("homeassistant/sensor/{}/{key}/config", device.identifiers),
                 QoS::AtMostOnce,
                 false,
                 serde_json::to_string(&payload)?,
@@ -69,9 +73,7 @@ impl MqttPublisher {
         Ok(())
     }
 
-    pub(crate) fn prepare_discovery_payload(&mut self, key: &str) -> Entity {
-        let device = Device::default();
-
+    pub(crate) fn prepare_discovery_payload(&mut self, key: &str, device: &Device) -> Entity {
         match key {
             "current_power" => {
                 Entity::power_sensor(key.to_string(), self.prefix.to_owned(), device)

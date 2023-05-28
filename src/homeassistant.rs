@@ -1,11 +1,28 @@
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct Device {
-    pub configuration_url: String,
+    pub configuration_url: Option<String>,
     pub identifiers: String,
     pub manufacturer: String,
     pub model: String,
     pub name: String,
-    pub sw_version: String,
+    pub sw_version: Option<String>,
+}
+
+#[derive(serde::Serialize, Debug)]
+pub struct Attributes {
+    pub timestamp: u32,
+    pub total_time: u32,
+    pub inverter_firmware: String,
+    pub hardware_version: String,
+    pub country_code: u16,
+    pub main_inverter_firmware: String,
+    pub slave_inverter_firmware: String,
+    pub year: u8,
+    pub month: u8,
+    pub day: u8,
+    pub hour: u8,
+    pub minute: u8,
+    pub second: u8,
 }
 
 #[derive(serde::Serialize)]
@@ -19,76 +36,67 @@ pub struct Entity {
     pub state_class: Option<String>,
     pub device_class: Option<String>,
     pub device: Device,
-}
-
-// TODO: Delete this
-impl Default for Device {
-    fn default() -> Self {
-        Device {
-            configuration_url: "http://10.0.0.64/index_cn.html".to_owned(),
-            identifiers: "sofar".to_owned(),
-            manufacturer: "Sofar".to_owned(),
-            model: "SF4ES003".to_owned(),
-            name: "Sofar SF4ES003".to_owned(),
-            sw_version: "LSW3_14_FFFF_1.0.34".to_owned(),
-        }
-    }
+    pub json_attributes_topic: String,
 }
 
 impl Entity {
-    pub fn power_sensor(name: String, prefix: String, device: Device) -> Self {
+    pub fn power_sensor(name: String, prefix: String, device: &Device) -> Self {
         Entity {
-            device,
+            device: device.to_owned(),
             name: name.to_string(),
             unique_id: format!("{name}_{prefix}"),
             object_id: format!("{name}_{prefix}"),
             qos: 0,
             unit_of_measurement: Some("W".to_string()),
-            state_topic: format!("{prefix}/{name}"),
+            state_topic: format!("{prefix}/state/{name}"),
             state_class: Some("measurement".to_string()),
             device_class: Some("power".to_string()),
+            json_attributes_topic: format!("{prefix}/attributes"),
         }
     }
 
-    pub fn new_temperature_entity(name: String, prefix: String, device: Device) -> Self {
+    pub fn new_temperature_entity(name: String, prefix: String, device: &Device) -> Self {
         Entity {
-            device,
+            device: device.to_owned(),
             name: name.to_string(),
             unique_id: format!("{name}_{prefix}"),
             object_id: format!("{name}_{prefix}"),
             qos: 0,
             unit_of_measurement: Some("°C".to_string()),
-            state_topic: format!("{prefix}/{name}"),
+            state_topic: format!("{prefix}/state/{name}"),
             state_class: Some("measurement".to_string()),
             device_class: Some("temperature".to_string()),
+            json_attributes_topic: format!("{prefix}/attributes"),
         }
     }
 
-    pub fn energy_sensor(name: String, prefix: String, device: Device) -> Self {
+    pub fn energy_sensor(name: String, prefix: String, device: &Device) -> Self {
         Entity {
-            device,
+            device: device.to_owned(),
             name: name.to_string(),
             unique_id: format!("{name}_{prefix}"),
             object_id: format!("{name}_{prefix}"),
             qos: 0,
             unit_of_measurement: Some("kWh".to_string()),
-            state_topic: format!("{prefix}/{name}"),
+            state_topic: format!("{prefix}/state/{name}"),
             state_class: Some("total_increasing".to_string()),
             device_class: Some("energy".to_string()),
+            json_attributes_topic: format!("{prefix}/attributes"),
         }
     }
 
-    pub fn generic_sensor(name: String, prefix: String, device: Device) -> Self {
+    pub fn generic_sensor(name: String, prefix: String, device: &Device) -> Self {
         Entity {
-            device,
+            device: device.to_owned(),
             name: name.to_string(),
             unique_id: format!("{name}_{prefix}"),
             object_id: format!("{name}_{prefix}"),
             qos: 0,
-            state_topic: format!("{prefix}/{name}"),
+            state_topic: format!("{prefix}/state/{name}"),
             device_class: None,
             state_class: Some("measurement".to_string()),
             unit_of_measurement: None,
+            json_attributes_topic: format!("{prefix}/attributes"),
         }
     }
 }

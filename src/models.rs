@@ -1,5 +1,6 @@
 use crate::helpers::{divide_i16_by, divide_u16_by, divide_u32_by, parse_string};
 use macaddr::MacAddr6;
+use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Primitive, Debug, Clone, Copy)]
@@ -56,14 +57,14 @@ pub struct Data {
     sensor_type_list: u16,
     total_operation_time: u32,
     timer: u32,
-    timestamp: u32,
+    pub timestamp: u32,
     #[serde(skip_serializing)]
     _sth: u16,
     counter: u32,
     #[serde(deserialize_with = "parse_string::<_, 16>")]
-    inventer_serial_number: String,
+    pub inverter_serial_number: String,
     #[serde(deserialize_with = "divide_i16_by::<_, 10>")]
-    inventer_temperature: f32,
+    pub inventer_temperature: f32,
     #[serde(deserialize_with = "divide_u16_by::<_, 10>")]
     vdc_1: f32,
     #[serde(deserialize_with = "divide_u16_by::<_, 10>")]
@@ -86,13 +87,13 @@ pub struct Data {
     vac_3: f32,
     #[serde(deserialize_with = "divide_u16_by::<_, 100>")]
     fac: f32,
-    current_power: u32,
+    pub current_power: u32,
     #[serde(deserialize_with = "divide_u32_by::<_, 100>")]
-    daily_energy: f64,
+    pub daily_energy: f64,
     #[serde(deserialize_with = "divide_u32_by::<_, 10>")]
-    total_energy: f64,
-    total_time: u32,
-    inverter_status: u16,
+    pub total_energy: f64,
+    pub total_time: u32,
+    pub inverter_status: u16,
     fault_code_1: u8,
     fault_code_2: u8,
     fault_code_3: u8,
@@ -106,10 +107,10 @@ pub struct Data {
     alert_message_code: u16,
     inner_board_message_code: u16,
     #[serde(deserialize_with = "parse_string::<_, 4>")]
-    inverter_firmware: String,
+    pub inverter_firmware: String,
     #[serde(deserialize_with = "parse_string::<_, 4>")]
-    hardware_version: String,
-    logger_temperature: i16,
+    pub hardware_version: String,
+    pub logger_temperature: i16,
     #[serde(deserialize_with = "divide_u16_by::<_, 10>")]
     bus_voltage: f32,
     #[serde(deserialize_with = "divide_u16_by::<_, 10>")]
@@ -122,7 +123,7 @@ pub struct Data {
     pv1_insulation_resistance: u16,
     pv2_insulation_resistance: u16,
     insulation_impedance: u16,
-    country_code: u16,
+    pub country_code: u16,
     #[serde(skip_serializing)]
     _sth4: u32,
     leaking_current: u16,
@@ -130,15 +131,15 @@ pub struct Data {
     b_phase_dc_distribution: u16,
     c_phase_dc_distribution: u16,
     #[serde(deserialize_with = "parse_string::<_, 4>")]
-    main_inverter_firmware: String,
+    pub main_inverter_firmware: String,
     #[serde(deserialize_with = "parse_string::<_, 4>")]
-    slave_inverter_firmware: String,
-    year: u8,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8,
+    pub slave_inverter_firmware: String,
+    pub year: u8,
+    pub month: u8,
+    pub day: u8,
+    pub hour: u8,
+    pub minute: u8,
+    pub second: u8,
     #[serde(skip_serializing)]
     _sth5: u32,
 }
@@ -159,10 +160,10 @@ pub struct Hello {
     signal_quality: u8,
     sensor_type: u8,
     #[serde(deserialize_with = "parse_string::<_, 40>")]
-    module_version: String,
+    pub module_version: String,
     sta_mac_address: MacAddr6,
     #[serde(deserialize_with = "parse_string::<_, 16>")]
-    local_ip_address: String,
+    pub local_ip_address: String,
     #[serde(skip_serializing)]
     zero2: u16,
     #[serde(skip_serializing)]
@@ -287,4 +288,13 @@ impl SofarResponseMessage {
             data_logger_sn: request.data_logger_sn,
         }
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct SensorsData {
+    pub inventer_temperature: f32,
+    pub current_power: u32,
+    pub daily_energy: f64,
+    pub total_energy: f64,
+    pub inverter_status: u16,
 }

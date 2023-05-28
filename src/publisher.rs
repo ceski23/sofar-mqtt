@@ -8,7 +8,7 @@ use std::error::Error;
 
 pub struct MqttPublisher {
     pub mqtt_client: AsyncClient,
-    event_loop: EventLoop,
+    pub event_loop: EventLoop,
     prefix: String,
 }
 
@@ -78,7 +78,7 @@ impl MqttPublisher {
             "current_power" => {
                 Entity::power_sensor(key.to_string(), self.prefix.to_owned(), device)
             }
-            "inventer_temperature" | "logger_temperature" => {
+            "inverter_temperature" | "logger_temperature" => {
                 Entity::new_temperature_entity(key.to_string(), self.prefix.to_owned(), device)
             }
             "daily_energy" | "total_energy" => {

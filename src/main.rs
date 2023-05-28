@@ -131,7 +131,7 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                         let sensors_data = SensorsData {
                             current_power: data.current_power,
                             daily_energy: data.daily_energy,
-                            inventer_temperature: data.inventer_temperature,
+                            inverter_temperature: data.inverter_temperature,
                             inverter_status: data.inverter_status,
                             total_energy: data.total_energy,
                         };
@@ -160,6 +160,8 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                                 }
                             }
                         }
+
+                        publisher.event_loop.poll().await?;
 
                         log::info!("Disconnecting from MQTT broker");
                         publisher.mqtt_client.disconnect().await?;

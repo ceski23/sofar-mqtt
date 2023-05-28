@@ -64,7 +64,7 @@ pub struct Data {
     #[serde(deserialize_with = "parse_string::<_, 16>")]
     pub inverter_serial_number: String,
     #[serde(deserialize_with = "divide_i16_by::<_, 10>")]
-    pub inventer_temperature: f32,
+    pub inverter_temperature: f32,
     #[serde(deserialize_with = "divide_u16_by::<_, 10>")]
     vdc_1: f32,
     #[serde(deserialize_with = "divide_u16_by::<_, 10>")]
@@ -292,7 +292,7 @@ impl SofarResponseMessage {
 
 #[derive(Debug, Serialize)]
 pub struct SensorsData {
-    pub inventer_temperature: f32,
+    pub inverter_temperature: f32,
     pub current_power: u32,
     pub daily_energy: f64,
     pub total_energy: f64,

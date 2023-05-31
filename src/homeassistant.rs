@@ -1,3 +1,5 @@
+use crate::messages::Data;
+
 #[derive(serde::Serialize, Clone)]
 pub struct Device {
     pub configuration_url: Option<String>,
@@ -25,6 +27,26 @@ pub struct Attributes {
     pub second: u8,
 }
 
+impl Attributes {
+    pub fn from_data(data: &Data) -> Self {
+        Attributes {
+            country_code: data.country_code,
+            day: data.day,
+            hardware_version: data.hardware_version.to_string(),
+            hour: data.hour,
+            inverter_firmware: data.inverter_firmware.to_string(),
+            main_inverter_firmware: data.main_inverter_firmware.to_string(),
+            minute: data.minute,
+            month: data.month,
+            second: data.second,
+            slave_inverter_firmware: data.slave_inverter_firmware.to_string(),
+            timestamp: data.timestamp,
+            total_time: data.total_time,
+            year: data.year,
+        }
+    }
+}
+
 #[derive(serde::Serialize)]
 pub struct Entity {
     pub name: String,
@@ -37,6 +59,32 @@ pub struct Entity {
     pub device_class: Option<String>,
     pub device: Device,
     pub json_attributes_topic: String,
+}
+
+#[derive(Debug)]
+#[allow(clippy::enum_variant_names)]
+pub enum EntityType {
+    PowerSensor {
+        name: String,
+        value: u32,
+    },
+    TemperatureSensor {
+        name: String,
+        value: f32,
+    },
+    EnergySensor {
+        name: String,
+        value: f64,
+    },
+    #[allow(dead_code)]
+    GenericSensor {
+        name: String,
+        value: f32,
+    },
+    GenericDiscreteSensor {
+        name: String,
+        value: String,
+    },
 }
 
 impl Entity {
@@ -55,7 +103,7 @@ impl Entity {
         }
     }
 
-    pub fn new_temperature_entity(name: String, prefix: String, device: &Device) -> Self {
+    pub fn temperature_entity(name: String, prefix: String, device: &Device) -> Self {
         Entity {
             device: device.to_owned(),
             name: name.to_string(),
@@ -85,7 +133,7 @@ impl Entity {
         }
     }
 
-    pub fn generic_sensor(name: String, prefix: String, device: &Device) -> Self {
+    pub fn generic_sensor(name: String, prefix: String, device: &Device, discrete: bool) -> Self {
         Entity {
             device: device.to_owned(),
             name: name.to_string(),
@@ -94,9 +142,38 @@ impl Entity {
             qos: 0,
             state_topic: format!("{prefix}/state/{name}"),
             device_class: None,
-            state_class: Some("measurement".to_string()),
+            state_class: if discrete {
+                None
+            } else {
+                Some("measurement".to_string())
+            },
             unit_of_measurement: None,
             json_attributes_topic: format!("{prefix}/attributes"),
         }
     }
+}
+
+pub fn entities_from_data(data: &Data) -> Vec<EntityType> {
+    vec![
+        EntityType::PowerSensor {
+            name: "current_power".to_string(),
+            value: data.current_power,
+        },
+        EntityType::EnergySensor {
+            name: "daily_energy".to_string(),
+            value: data.daily_energy,
+        },
+        EntityType::TemperatureSensor {
+            name: "inverter_temperature".to_string(),
+            value: data.inverter_temperature,
+        },
+        EntityType::GenericDiscreteSensor {
+            name: "inverter_status".to_string(),
+            value: data.inverter_status.to_string(),
+        },
+        EntityType::EnergySensor {
+            name: "total_energy".to_string(),
+            value: data.total_energy,
+        },
+    ]
 }

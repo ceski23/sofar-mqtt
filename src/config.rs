@@ -1,16 +1,6 @@
 use serde::Deserialize;
 
-fn default_tcp_port() -> u16 {
-    8080
-}
-
-fn default_mqtt_host() -> String {
-    String::from("localhost")
-}
-
-fn default_mqtt_port() -> u16 {
-    1883
-}
+pub static MQTT_CLIENT_ID: &str = "sofar-mqtt";
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
@@ -22,4 +12,16 @@ pub struct Config {
     pub mqtt_password: Option<String>,
     #[serde(default = "default_tcp_port")]
     pub tcp_port: u16,
+}
+
+fn default_tcp_port() -> u16 {
+    8080
+}
+
+fn default_mqtt_host() -> String {
+    String::from("localhost")
+}
+
+fn default_mqtt_port() -> u16 {
+    1883
 }

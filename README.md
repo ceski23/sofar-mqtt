@@ -1,203 +1,118 @@
-## Sensors
+# sofar-mqtt
 
-### Current power
-Topic: `homeassistant/sensor/sofar/current_power/config`
+![Rust Version](https://img.shields.io/badge/rust-1.69+-orange.svg)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/ceski23/sofar-mqtt/blob/main/LICENSE)
 
-Payload:
-```json
-{
-  "~": "sofar",
-  "name": "Current power",
-  "unique_id": "sofar_current_power",
-  "object_id": "sofar_current_power",
-  "qos": 0,
-  "unit_of_measurement": "W",
-  "state_topic": "~/currentPower",
-  "state_class": "measurement",
-  "device_class": "power",
-  "device": {
-    "configuration_url": "http://10.0.0.64/index_cn.html",
-    "identifiers": "sofar",
-    "manufacturer": "Sofar",
-    "model": "SF4ES003",
-    "name": "Sofar SF4ES003",
-    "sw_version": "LSW3_14_FFFF_1.0.34"
-  }
-}
+**sofar-mqtt** is a Rust-based project that enables the reception and parsing of data frames from the Sofar photovoltaic (PV) inverter and facilitates sending them to an MQTT broker. This lightweight and efficient tool aims to simplify the integration of Sofar inverters with MQTT-based home automation systems like Home Assistant, energy monitoring platforms, or any other applications requiring real-time PV data.
+
+## Features
+
+- Connects to a Sofar PV inverter via TCP connection to dedicated data logger (LSW-3),
+- Receives data frames emitted by the inverter in a specific protocol format,
+- Parses the received frames to extract relevant data such as current power output, voltage, and other parameters,
+- Sends the parsed data to an MQTT broker for further processing or integration with other systems,
+- Implements error handling and logging to ensure reliable operation.
+
+## Installation
+
+1. Ensure you have Rust and Cargo installed. If not, follow the instructions provided at the [Rust website](https://www.rust-lang.org/tools/install).
+
+2. Clone the **sofar-mqtt** repository:
+
+   ```shell
+   git clone https://github.com/ceski23/sofar-mqtt.git
+   ```
+
+3. Change to the project directory:
+
+   ```shell
+   cd sofar-mqtt
+   ```
+
+4. Build the project using Cargo:
+
+   ```shell
+   cargo build --release
+   ```
+
+## Usage
+
+To run **sofar-mqtt**, use the following command:
+
+```shell
+cargo run --release
 ```
 
-### Inventer temperature
-Topic: `homeassistant/sensor/sofar/inventer_temperature/config`
+Alternatively run built executable directly:
 
-Payload:
-```json
-{
-  "~": "sofar",
-  "name": "Inventer temperature",
-  "unique_id": "sofar_inventer_temperature",
-  "object_id": "sofar_inventer_temperature",
-  "qos": 0,
-  "unit_of_measurement": "°C",
-  "state_topic": "~/inverterTemp",
-  "state_class": "measurement",
-  "device_class": "temperature",
-  "device": {
-    "configuration_url": "http://10.0.0.64/index_cn.html",
-    "identifiers": "sofar",
-    "manufacturer": "Sofar",
-    "model": "SF4ES003",
-    "name": "Sofar SF4ES003",
-    "sw_version": "LSW3_14_FFFF_1.0.34"
-  }
-}
+```shell
+./target/[TARGET_ARCHITECTURE]/release/sofar-mqtt
 ```
 
-### Yield today
-Topic: `homeassistant/sensor/sofar/yield_today/config`
+## Configuration
 
-Payload:
-```json
-{
-  "~": "sofar",
-  "name": "Yield today",
-  "unique_id": "sofar_yield_today",
-  "object_id": "sofar_yield_today",
-  "qos": 0,
-  "unit_of_measurement": "kWh",
-  "state_topic": "~/eToday",
-  "state_class": "total_increasing",
-  "device_class": "energy",
-  "device": {
-    "configuration_url": "http://10.0.0.64/index_cn.html",
-    "identifiers": "sofar",
-    "manufacturer": "Sofar",
-    "model": "SF4ES003",
-    "name": "Sofar SF4ES003",
-    "sw_version": "LSW3_14_FFFF_1.0.34"
-  }
-}
-```
+**sofar-mqtt** can be configured using environmental variables. The available configuration options include:
 
-### Yield total
-Topic: `homeassistant/sensor/sofar/yield_total/config`
+- `MQTT_HOST`: Specify the MQTT broker's address to which the parsed data will be sent (Default: `localhost`)
+- `MQTT_PORT`: Specify the MQTT broker's port to which the parsed data will be sent (Default: `1883`)
+- `MQTT_USER`: Specify the username used when connecting to MQTT
+- `MQTT_PASSWORD`: Specify the username used when connecting to MQTT
+- `TCP_PORT`: Specify the TCP port used to connect to the Sofar Data Logger (Default: `8080`)
 
-Payload:
-```json
-{
-  "~": "sofar",
-  "name": "Yield total",
-  "unique_id": "sofar_yield_total",
-  "object_id": "sofar_yield_total",
-  "qos": 0,
-  "unit_of_measurement": "kWh",
-  "state_topic": "~/eTotal",
-  "state_class": "total_increasing",
-  "device_class": "energy",
-  "device": {
-    "configuration_url": "http://10.0.0.64/index_cn.html",
-    "identifiers": "sofar",
-    "manufacturer": "Sofar",
-    "model": "SF4ES003",
-    "name": "Sofar SF4ES003",
-    "sw_version": "LSW3_14_FFFF_1.0.34"
-  }
-}
-```
+To set these environmental variables, you can either export them in your shell environment, write them in `.env` file or specify them when running the Docker container.
 
+## Using the Docker Image
 
+Alternatively, you can use the provided Docker image to run **sofar-mqtt** without having to install Rust and its dependencies manually. The Docker image ensures a consistent and isolated environment for running the application.
 
+> **Warning**
+> For now, only image for ARM64 architecture is provided
 
-## sample data
-Server response: `[165,10,0,16,23,23,23,79,172,254,103,0,1,89,129,82,100,120,0,0,0,200,21]`
+To use the Docker image, follow these steps:
 
-Heartbeat: `[165,1,0,16,71,31,32,79,172,254,103,0,247,21]`
+1. Pull the Docker image from the repository:
 
-Data: `[165,151,0,16,66,44,45,79,172,254,103,1,1,39,173,118,1,0,27,12,0,0,228,17,81,100,1,0,187,1,0,0,83,70,52,69,83,48,48,51,77,52,67,48,53,56,32,32,114,1,94,11,217,2,5,0,0,0,8,0,9,0,8,0,225,8,207,8,213,8,134,19,110,0,0,0,229,1,0,0,176,119,0,0,246,23,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,86,50,56,48,86,49,48,48,21,0,55,24,79,11,202,2,60,0,1,0,52,5,77,6,23,5,7,0,0,0,0,0,6,0,228,3,224,3,227,3,86,50,56,48,86,50,56,48,23,5,3,18,14,19,15,0,0,0,239,21]`
+   ```shell
+   docker pull ghcr.io/ceski23/sofar-mqtt:master
+   ```
 
-Data decoded:
-```json
-{
-    "loggerSN": 1744743503,
-    "sensorTypeList": "2701",
-    "tOperationTime": 95917,
-    "inverterSN": "SF4ES003M4C058",
-    "inverterTemp": 37,
-    "VDC1": 291,
-    "VDC2": 72.9,
-    "IDC1": 0.5,
-    "IDC2": 0,
-    "IAC1": 0.8,
-    "IAC2": 0.9,
-    "IAC3": 0.8,
-    "VAC1": 227.3,
-    "VAC2": 225.5,
-    "VAC3": 226.1,
-    "fAC": 49.98,
-    "currentPower": 110,
-    "eToday": 4.85,
-    "eTotal": 3064,
-    "hTotal": 6134,
-    "inverterStatus": "normal",
-    "loggerTemp": 21,
-    "Vbus": 619.9,
-    "VCPU1": 289.5,
-    "countdownTime": 60,
-    "PV1insulationResistance": 1332,
-    "PV2insulationResistance": 1613,
-    "cathode_groundInsulationImpedance": 1303,
-    "countryCode": 7,
-    "A_phaseDCdistribution": 996,
-    "B_phaseDCdistribution": 992,
-    "C_phaseDCdistribution": 995,
-    "firmware": "V280",
-    "year": 23,
-    "month": 5,
-    "day": 3,
-    "hour": 18,
-    "minute": 14,
-    "second": 19
-}
-```
+2. Run the Docker container with the necessary configuration options:
 
-Server response 1: `[165,10,0,16,23,62,62,79,172,254,103,0,1,5,84,102,100,120,0,0,0,169,21]`
-Server response 2: `[165,10,0,16,18,63,63,79,172,254,103,1,1,126,84,102,100,120,0,0,0,32,21]`
+   ```shell
+   docker run --name sofar-mqtt -d -p 3000:8080 ghcr.io/ceski23/sofar-mqtt:master
+   ```
 
+> **Note**
+> For more information on available options and configuration, please refer to the [configuration](#configuration) section.
 
+## Building the Docker Image
 
+If you prefer to build the Docker image locally, follow these steps:
 
-hello: `[165,86,0,16,65,0,1,79,172,254,103,2,36,35,14,0,33,0,0,0,0,0,0,0,5,60,120,2,37,1,76,83,87,51,95,49,52,95,70,70,70,70,95,49,46,48,46,51,52,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,52,234,231,44,60,22,49,48,46,48,46,48,46,54,52,0,0,0,0,0,0,0,1,0,1,1,39,170,21]`
-decoded:
-```json
-{"loggerSN":1744743503,"tOperationTime":926500,"uploadingFrequency":5,"dataLoggingFrequency":60,"heartbeatFrequency":120,"commandType":2,"signalQuality":37,"sensorTypeNr":1,"moduleVersion":"LSW3_14_FFFF_1.0.34\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000","macAddress":"34:ea:e7:2c:3c:16","localIP":"10.0.0.64\u0000\u0000\u0000\u0000\u0000\u0000","sensorTypeList":"2701"}
-```
+1. Clone the **sofar-mqtt** repository:
 
-hello_cd: `[165,28,0,16,72,3,4,79,172,254,103,1,41,35,14,0,38,0,0,0,212,49,88,100,1,1,12,6,35,14,0,0,0,0,0,0,0,0,0,98,21]`
-decoded:
-```json
-{"loggerSN":1744743503,"totalOperationTime":926505}
-```
+   ```shell
+   git clone https://github.com/ceski23/sofar-mqtt.git
+   ```
 
-hello_end: `[165,60,0,16,72,7,8,79,172,254,103,1,46,35,14,0,43,0,0,0,212,49,88,100,1,5,44,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,85,21]`
-decoded:
-```json
-{"loggerSN":1744743503,"totalOperationTime":926510}
-```
+2. Change to the project directory:
 
+   ```shell
+   cd sofar-mqtt
+   ```
 
-https://developers.home-assistant.io/docs/core/entity/sensor
+3. Build the Docker image using the provided Dockerfile:
 
+   ```shell
+   docker build -t sofar-mqtt .
+   ```
 
+4. Proceed to use the Docker image as described in the previous section.
 
+## License
 
+This project is licensed under the [MIT License](LICENSE).
 
+## Acknowledgments
 
-HELLO: `[165,86,0,16,65,3,4,79,172,254,103,2,71,125,14,0,127,0,0,0,0,0,0,0,5,60,120,2,25,1,76,83,87,51,95,49,52,95,70,70,70,70,95,49,46,48,46,51,52,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,52,234,231,44,60,22,49,48,46,48,46,48,46,54,52,0,0,0,0,0,0,0,1,0,1,1,39,127,21]`
-RESPONSE: `[165,10,0,16,17,4,4,79,172,254,103,2,1,140,39,103,100,120,0,0,0,140,21]`
-
-
-
-DATA: `[165,151,0,16,66,4,5,79,172,254,103,1,1,39,72,125,14,0,128,0,0,0,69,170,88,100,1,0,40,13,0,0,83,70,52,69,83,48,48,51,77,52,67,48,53,56,32,32,104,1,122,11,213,2,12,0,0,0,9,0,10,0,9,0,195,8,216,8,201,8,135,19,54,1,0,0,69,0,0,0,174,126,0,0,220,24,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,86,50,56,48,86,49,48,48,21,0,4,24,100,11,193,2,60,0,1,0,40,5,87,6,33,5,7,0,0,0,0,0,6,0,226,3,227,3,227,3,86,50,56,48,86,50,56,48,23,5,19,9,36,49,37,0,0,0,96,21]`
-RESPONSE: `[165,10,0,16,18,5,5,79,172,254,103,1,1,141,39,103,100,120,0,0,0,143,21]`
-
-HELLO_END: `[165,60,0,16,72,9,13,79,172,254,103,1,194,133,14,0,139,0,0,0,110,170,88,100,1,5,44,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,255,197,21]`
-RESPONSE: `[165,10,0,16,24,10,13,79,172,254,103,1,1,48,48,103,100,120,0,0,0,78,21]`
+- decoded Sofar data frames courtesy of [serek4/node-red-sofar-inverter](https://github.com/serek4/node-red-sofar-inverter)

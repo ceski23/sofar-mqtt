@@ -30,6 +30,7 @@ where
     Ok(f64::from(value) / f64::from(N))
 }
 
+#[allow(clippy::needless_range_loop)]
 pub fn parse_string<'de, D, const LENGTH: usize>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,

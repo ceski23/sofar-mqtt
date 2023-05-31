@@ -6,21 +6,23 @@ extern crate num_traits;
 
 mod codec;
 mod config;
-mod helpers;
 mod homeassistant;
-mod models;
-mod publisher;
+mod messages;
+mod mqtt;
+mod serde_helpers;
 
 use crate::{
     codec::SofarCodec,
     config::Config,
-    homeassistant::{Attributes, Device},
-    models::{MessageData, SensorsData, SofarResponseMessage},
-    publisher::MqttPublisher,
+    homeassistant::{entities_from_data, Attributes, Device},
+    messages::{IncomingMessageData, SofarMessage},
+    mqtt::MqttPublisher,
 };
 use futures_util::{SinkExt, StreamExt};
-use serde_json::{Map, Value};
-use std::error::Error;
+use std::{
+    error::Error,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use tokio::{
     io,
     net::{TcpListener, TcpStream},
@@ -68,10 +70,12 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
             Err(err) => log::error!("Error while reading frame ({:#?})", err),
             Ok(message) => {
                 log::info!("Received frame of type {:?}", message.message_type);
-                let response_message = SofarResponseMessage::new(&message);
+
+                let response_message =
+                    SofarMessage::from_incoming_message(&message, current_timestamp());
 
                 match message.data {
-                    MessageData::Data(data) => {
+                    IncomingMessageData::Data(data) => {
                         log::info!("{:?}", data);
                         log::info!("Responding with {:?}", response_message);
                         framed_stream.send(response_message).await?;
@@ -82,69 +86,35 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                                 .map(|ip| format!("http://{}/index_cn.html", ip)),
                             identifiers: format!(
                                 "sofar_{}",
-                                &data.inverter_serial_number.trim().to_lowercase()
+                                data.inverter_serial_number.trim().to_lowercase()
                             ),
                             manufacturer: String::from("Sofar"),
-                            model: format!("{}", &data.inverter_serial_number.trim()),
-                            name: format!("Sofar {}", &data.inverter_serial_number.trim()),
+                            model: data.inverter_serial_number.trim().to_string(),
+                            name: format!("Sofar {}", data.inverter_serial_number.trim()),
                             sw_version: module_version.to_owned(),
                         };
+                        let attributes = Attributes::from_data(&data);
+                        let entities = entities_from_data(&data);
 
-                        let attributes = Attributes {
-                            country_code: data.country_code,
-                            day: data.day,
-                            hardware_version: format!("{}", data.hardware_version),
-                            hour: data.hour,
-                            inverter_firmware: format!("{}", data.inverter_firmware),
-                            main_inverter_firmware: format!("{}", data.main_inverter_firmware),
-                            minute: data.minute,
-                            month: data.month,
-                            second: data.second,
-                            slave_inverter_firmware: format!("{}", data.slave_inverter_firmware),
-                            timestamp: data.timestamp,
-                            total_time: data.total_time,
-                            year: data.year,
-                        };
-
-                        let mut publisher = MqttPublisher::new(format!(
+                        let mut mqtt_publisher = MqttPublisher::new(format!(
                             "sofar_{}",
-                            &data.inverter_serial_number.trim().to_lowercase()
+                            data.inverter_serial_number.trim().to_lowercase()
                         ));
 
                         log::info!("Sending data to MQTT broker");
                         log::info!("Sending attributes ({:?})", attributes);
 
-                        match publisher
-                            .publish_state(
-                                format!("attributes"),
-                                &serde_json::to_value(&attributes)?,
-                            )
+                        mqtt_publisher
+                            .publish_attributes(&serde_json::to_value(&attributes)?)
                             .await
-                        {
-                            Ok(_) => {}
-                            Err(err) => {
-                                log::error!("Error sending data to MQTT broker ({:?})", err);
-                                break;
-                            }
-                        }
+                            .unwrap_or_else(|err| {
+                                log::error!("Error sending data to MQTT broker ({:?})", err)
+                            });
 
-                        let sensors_data = SensorsData {
-                            current_power: data.current_power,
-                            daily_energy: data.daily_energy,
-                            inverter_temperature: data.inverter_temperature,
-                            inverter_status: data.inverter_status,
-                            total_energy: data.total_energy,
-                        };
+                        log::info!("Sending data ({:?})", entities);
 
-                        log::info!("Sending data ({:?})", sensors_data);
-
-                        for (key, value) in serde_json::from_value::<Map<String, Value>>(
-                            serde_json::to_value(&sensors_data)?,
-                        )? {
-                            match publisher
-                                .publish_state(format!("state/{key}"), &value)
-                                .await
-                            {
+                        for entity in entities {
+                            match mqtt_publisher.publish_discovery(&entity, &device).await {
                                 Ok(_) => {}
                                 Err(err) => {
                                     log::error!("Error sending data to MQTT broker ({:?})", err);
@@ -152,7 +122,7 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                                 }
                             }
 
-                            match publisher.pubish_discovery(key.to_owned(), &device).await {
+                            match mqtt_publisher.publish_state(&entity).await {
                                 Ok(_) => {}
                                 Err(err) => {
                                     log::error!("Error sending data to MQTT broker ({:?})", err);
@@ -161,12 +131,12 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                             }
                         }
 
-                        publisher.event_loop.poll().await?;
+                        mqtt_publisher.event_loop.poll().await?;
 
                         log::info!("Disconnecting from MQTT broker");
-                        publisher.mqtt_client.disconnect().await?;
+                        mqtt_publisher.mqtt_client.disconnect().await?;
                     }
-                    MessageData::Hello(data) => {
+                    IncomingMessageData::Hello(data) => {
                         log::info!("Decoded: {:?}", data);
 
                         inverter_ip = Some(
@@ -192,4 +162,14 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
 
     log::info!("Finishing TCP connection");
     Ok(())
+}
+
+fn current_timestamp() -> u32 {
+    u32::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    )
+    .unwrap_or_default()
 }

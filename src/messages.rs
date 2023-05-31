@@ -1,10 +1,8 @@
-use crate::helpers::{divide_i16_by, divide_u16_by, divide_u32_by, parse_string};
+use crate::serde_helpers::{divide_i16_by, divide_u16_by, divide_u32_by, parse_string};
 use macaddr::MacAddr6;
-use serde::Serialize;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Primitive, Debug, Clone, Copy)]
-pub enum MessageType {
+pub enum SofarMessageType {
     Heartbeat = 0x4710,
     Data = 0x4210,
     Hello = 0x4110,
@@ -15,51 +13,30 @@ pub enum MessageType {
 #[allow(dead_code)]
 #[derive(serde::Serialize, Debug)]
 pub struct ServerResponse {
-    // always matches request
-    message_id: u8,
-    one: u8,
+    pub message_id: u8,
+    _unknown1: u8,
     pub timestamp: u32,
-    sth2: u16,
-    zero: u16,
-}
-
-impl ServerResponse {
-    pub(crate) fn new(message_id: u8) -> Self {
-        let timestamp = u32::try_from(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-        )
-        .unwrap_or_default();
-
-        ServerResponse {
-            message_id,
-            one: 1,
-            timestamp,
-            sth2: 0x0078,
-            zero: 0,
-        }
-    }
+    _unknown2: u16,
+    _unknown3: u16,
 }
 
 #[allow(dead_code)]
 #[derive(serde::Deserialize, Debug)]
 pub struct Heartbeat {
-    pub zero: u8,
+    pub _unknown: u8,
 }
 
 #[allow(dead_code)]
 #[derive(serde::Deserialize, Debug, serde::Serialize)]
 pub struct Data {
     #[serde(skip_serializing)]
-    pub _sth0: u8,
+    pub _unknown1: u8,
     sensor_type_list: u16,
     total_operation_time: u32,
     timer: u32,
     pub timestamp: u32,
     #[serde(skip_serializing)]
-    _sth: u16,
+    _unknown2: u16,
     counter: u32,
     #[serde(deserialize_with = "parse_string::<_, 16>")]
     pub inverter_serial_number: String,
@@ -116,16 +93,16 @@ pub struct Data {
     #[serde(deserialize_with = "divide_u16_by::<_, 10>")]
     vice_cpu_input_voltage: f32,
     #[serde(skip_serializing)]
-    _sth2: u16,
+    _unknown3: u16,
     countdown_time: u16,
     #[serde(skip_serializing)]
-    _sth3: u16,
+    _unknown4: u16,
     pv1_insulation_resistance: u16,
     pv2_insulation_resistance: u16,
     insulation_impedance: u16,
     pub country_code: u16,
     #[serde(skip_serializing)]
-    _sth4: u32,
+    _unknown5: u32,
     leaking_current: u16,
     a_phase_dc_distribution: u16,
     b_phase_dc_distribution: u16,
@@ -141,7 +118,7 @@ pub struct Data {
     pub minute: u8,
     pub second: u8,
     #[serde(skip_serializing)]
-    _sth5: u32,
+    _unknown6: u32,
 }
 
 #[allow(dead_code)]
@@ -152,7 +129,7 @@ pub struct Hello {
     total_operation_time: u32,
     timer: u32,
     #[serde(skip_serializing)]
-    zero: u32,
+    _unknown1: u32,
     uploading_frequency: u8,
     data_logging_frequency: u8,
     hearbeat_frequency: u8,
@@ -165,9 +142,9 @@ pub struct Hello {
     #[serde(deserialize_with = "parse_string::<_, 16>")]
     pub local_ip_address: String,
     #[serde(skip_serializing)]
-    zero2: u16,
+    _unknown2: u16,
     #[serde(skip_serializing)]
-    one2: u16,
+    _unknown3: u16,
     sensor_type_list: u16,
 }
 
@@ -178,11 +155,11 @@ pub struct HelloCd {
     total_operation_time: u32,
     timer: u32,
     timestamp: u32,
-    one2: u16,
-    sth: u32,
-    zero: u8,
-    sth2: u32,
-    timestamp2: u32,
+    _unknown1: u16,
+    _unknown2: u32,
+    _unknown3: u8,
+    _unknown4: u32,
+    _unknown5: u32,
 }
 
 #[allow(dead_code)]
@@ -192,109 +169,101 @@ pub struct HelloEnd {
     total_operation_time: u32,
     timer: u32,
     timestamp: u32,
-    sth: u16,
-    sth2: u16,
-    sth3: u16,
-    sth4: u16,
-    sth5: u16,
-    sth6: u16,
-    sth7: u16,
-    sth8: u16,
-    sth9: u16,
-    sth10: u16,
-    sth11: u16,
-    sth12: u16,
-    sth13: u16,
-    sth14: u16,
-    sth15: u16,
-    sth16: u16,
-    sth17: u16,
-    sth18: u16,
-    sth19: u16,
-    sth20: u16,
-    sth21: u16,
-    sth22: u16,
-    sth23: u16,
-    sth24: u8,
+    _unknown1: u16,
+    _unknown2: u16,
+    _unknown3: u16,
+    _unknown4: u16,
+    _unknown5: u16,
+    _unknown6: u16,
+    _unknown7: u16,
+    _unknown8: u16,
+    _unknown9: u16,
+    _unknown10: u16,
+    _unknown11: u16,
+    _unknown12: u16,
+    _unknown13: u16,
+    _unknown14: u16,
+    _unknown15: u16,
+    _unknown16: u16,
+    _unknown17: u16,
+    _unknown18: u16,
+    _unknown19: u16,
+    _unknown20: u16,
+    _unknown21: u16,
+    _unknown22: u16,
+    _unknown23: u16,
+    _unknown24: u8,
 }
 
 #[allow(dead_code)]
 #[derive(serde::Deserialize, Debug)]
 pub struct Unknown44 {
-    pub _sth1: u8,
-    _sth2: u8,
-    _sth3: u8,
-    _sth4: u8,
-    _sth5: u8,
-    _sth6: u8,
-    _sth7: u8,
-    _sth8: u8,
-    _sth9: u8,
+    pub _unknown1: u8,
+    _unknown2: u8,
+    _unknown3: u8,
+    _unknown4: u8,
+    _unknown5: u8,
+    _unknown6: u8,
+    _unknown7: u8,
+    _unknown8: u8,
+    _unknown9: u8,
     timestamp: u32,
-    _sth10: u16,
+    _unknown10: u16,
     #[serde(deserialize_with = "parse_string::<_, 16>")]
     wifi_ssid: String,
 }
 
 #[derive(Debug)]
-pub enum MessageData {
+pub enum IncomingMessageData {
     Heartbeat(Heartbeat),
     Data(Data),
     Hello(Hello),
     HelloCd(HelloCd),
+    #[allow(dead_code)]
     HelloEnd(HelloEnd),
     Unknown44(Unknown44),
 }
 
 #[derive(Debug)]
-pub struct SofarMessage {
-    pub data: MessageData,
-    pub message_type: MessageType,
+pub enum OutgoingMessageData {
+    ServerResponse(ServerResponse),
+}
+
+#[derive(Debug)]
+pub struct SofarMessage<T> {
+    pub data: T,
+    pub message_type: SofarMessageType,
     pub message_number: u8,
     pub message_number_2: u8,
     pub data_logger_sn: u32,
 }
 
-#[derive(Debug)]
-pub enum ResponseData {
-    ServerResponse(ServerResponse),
-}
-
-#[derive(Debug)]
-pub struct SofarResponseMessage {
-    pub data: ResponseData,
-    pub request_type: MessageType,
-    pub request_message_number: u8,
-    pub request_message_number_2: u8,
-    pub data_logger_sn: u32,
-}
-
-impl SofarResponseMessage {
-    pub fn new(request: &SofarMessage) -> Self {
+impl SofarMessage<OutgoingMessageData> {
+    pub fn from_incoming_message(
+        request: &SofarMessage<IncomingMessageData>,
+        timestamp: u32,
+    ) -> Self {
         let message_id = match &request.data {
-            MessageData::Heartbeat(data) => data.zero,
-            MessageData::Data(data) => data._sth0,
-            MessageData::Hello(data) => data.one,
-            MessageData::HelloCd(data) => data.one,
-            MessageData::HelloEnd(data) => data.one,
-            MessageData::Unknown44(data) => data._sth1,
+            IncomingMessageData::Heartbeat(data) => data._unknown,
+            IncomingMessageData::Data(data) => data._unknown1,
+            IncomingMessageData::Hello(data) => data.one,
+            IncomingMessageData::HelloCd(data) => data.one,
+            IncomingMessageData::HelloEnd(data) => data.one,
+            IncomingMessageData::Unknown44(data) => data._unknown1,
         };
 
-        SofarResponseMessage {
-            data: ResponseData::ServerResponse(ServerResponse::new(message_id)),
-            request_type: request.message_type,
-            request_message_number: request.message_number,
-            request_message_number_2: request.message_number_2,
+        SofarMessage {
+            data: OutgoingMessageData::ServerResponse(ServerResponse {
+                message_id,
+                _unknown1: 1,
+                timestamp,
+                _unknown2: 0x0078,
+                _unknown3: 0,
+            }),
+            message_type: request.message_type,
+            message_number: request.message_number + 1,
+            message_number_2: request.message_number_2,
             data_logger_sn: request.data_logger_sn,
         }
     }
-}
-
-#[derive(Debug, Serialize)]
-pub struct SensorsData {
-    pub inverter_temperature: f32,
-    pub current_power: u32,
-    pub daily_energy: f64,
-    pub total_energy: f64,
-    pub inverter_status: u16,
 }

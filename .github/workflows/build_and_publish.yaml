@@ -1,4 +1,4 @@
-name: Create and publish a Docker image
+name: Build and release
 on: workflow_dispatch
 
 env:
@@ -26,15 +26,38 @@ jobs:
           command: test
 
   build-and-push-image:
+    name: Build and release
     needs: test
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # to be able to publish a GitHub release
+      issues: write # to be able to comment on released issues
+      pull-requests: write # to be able to comment on released pull requests
       packages: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Install cargo-edit
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-edit
+          version: "^0.12.0"
+          features: set-version
+          args: --no-default-features
+
+      - name: Semantic Release
+        id: semantic-release
+        uses: cycjimmy/semantic-release-action@v3
+        with:
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            @semantic-release/exec
+            @semantic-release/github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -56,6 +79,7 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: type=semver,pattern={{version}},value=${{ steps.semantic-release.outputs.new_release_version }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4

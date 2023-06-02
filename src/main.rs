@@ -1,12 +1,12 @@
 #[macro_use]
 extern crate enum_primitive_derive;
 extern crate dotenv;
-extern crate log;
 extern crate num_traits;
 
 mod codec;
 mod config;
 mod homeassistant;
+mod logger;
 mod messages;
 mod mqtt;
 mod serde_helpers;
@@ -24,60 +24,56 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tokio::{
-    io,
     net::{TcpListener, TcpStream},
     task,
 };
 use tokio_util::codec::Framed;
+use tracing::{error, info};
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
+async fn main() -> Result<(), Box<dyn Error>> {
     dotenv::dotenv().ok();
-    env_logger::init_from_env(
-        env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
-    );
+    logger::init_logger()?;
 
-    log::info!("Starting sofar-mqtt!");
+    info!("Starting sofar-mqtt v{}", env!("CARGO_PKG_VERSION"));
 
     let config = serde_env::from_env::<Config>().unwrap();
     let listener = TcpListener::bind(format!("0.0.0.0:{0}", config.tcp_port)).await?;
-    log::info!("Waiting for connections");
+    info!("Waiting for connections");
 
     loop {
-        let (mut socket, connection) = listener.accept().await?;
+        let (socket, _connection) = listener.accept().await?;
         task::spawn(async move {
-            log::info!(
-                "Spawning connection handler #{0} for {1}:{2}",
-                tokio::task::id(),
-                connection.ip(),
-                connection.port()
-            );
-            match process_socket(&mut socket).await {
-                Ok(_) => log::info!("Finished connection #{0}", tokio::task::id()),
-                Err(_) => log::error!("Closing connection #{0} with error", tokio::task::id()),
+            match process_socket(socket).await {
+                Ok(_) => {}
+                Err(err) => error!("Finished connection with error {:?}", err),
             }
         });
     }
 }
 
-async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
+#[tracing::instrument(
+    skip_all,
+    fields(ip = %stream.peer_addr().unwrap()),
+)]
+async fn process_socket(stream: TcpStream) -> Result<(), Box<dyn Error>> {
+    info!("Spawning connection handler");
+
     let mut inverter_ip: Option<String> = None;
     let mut module_version: Option<String> = None;
     let mut framed_stream = Framed::new(stream, SofarCodec::default());
 
     while let Some(frame) = framed_stream.next().await {
         match frame {
-            Err(err) => log::error!("Error while reading frame ({:#?})", err),
+            Err(err) => error!("Error while reading frame ({:#?})", err),
             Ok(message) => {
-                log::info!("Received frame of type {:?}", message.message_type);
+                info!("Received frame of type {:?}", message.message_type);
 
                 let response_message =
                     SofarMessage::from_incoming_message(&message, current_timestamp());
 
                 match message.data {
                     IncomingMessageData::Data(data) => {
-                        log::info!("{:?}", data);
-                        log::info!("Responding with {:?}", response_message);
                         framed_stream.send(response_message).await?;
 
                         let device = Device {
@@ -101,23 +97,23 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                             data.inverter_serial_number.trim().to_lowercase()
                         ));
 
-                        log::info!("Sending data to MQTT broker");
-                        log::info!("Sending attributes ({:?})", attributes);
+                        info!("Sending data to MQTT broker");
+                        info!("Sending attributes ({:?})", attributes);
 
                         mqtt_publisher
                             .publish_attributes(&serde_json::to_value(&attributes)?)
                             .await
                             .unwrap_or_else(|err| {
-                                log::error!("Error sending data to MQTT broker ({:?})", err)
+                                error!("Error sending data to MQTT broker ({:?})", err)
                             });
 
-                        log::info!("Sending data ({:?})", entities);
+                        info!("Sending data ({:?})", entities);
 
                         for entity in entities {
                             match mqtt_publisher.publish_discovery(&entity, &device).await {
                                 Ok(_) => {}
                                 Err(err) => {
-                                    log::error!("Error sending data to MQTT broker ({:?})", err);
+                                    error!("Error sending data to MQTT broker ({:?})", err);
                                     break;
                                 }
                             }
@@ -125,7 +121,7 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                             match mqtt_publisher.publish_state(&entity).await {
                                 Ok(_) => {}
                                 Err(err) => {
-                                    log::error!("Error sending data to MQTT broker ({:?})", err);
+                                    error!("Error sending data to MQTT broker ({:?})", err);
                                     break;
                                 }
                             }
@@ -133,12 +129,10 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
 
                         mqtt_publisher.event_loop.poll().await?;
 
-                        log::info!("Disconnecting from MQTT broker");
+                        info!("Disconnecting from MQTT broker");
                         mqtt_publisher.mqtt_client.disconnect().await?;
                     }
                     IncomingMessageData::Hello(data) => {
-                        log::info!("Decoded: {:?}", data);
-
                         inverter_ip = Some(
                             data.local_ip_address
                                 .trim_matches(char::from(0))
@@ -146,13 +140,9 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
                         );
                         module_version =
                             Some(data.module_version.trim_matches(char::from(0)).to_string());
-
-                        log::info!("Responding with {:?}", response_message);
                         framed_stream.send(response_message).await?;
                     }
-                    data => {
-                        log::info!("Decoded: {:?}", data);
-                        log::info!("Responding with {:?}", response_message);
+                    _ => {
                         framed_stream.send(response_message).await?;
                     }
                 }
@@ -160,7 +150,7 @@ async fn process_socket(stream: &mut TcpStream) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    log::info!("Finishing TCP connection");
+    info!("Finishing TCP connection");
     Ok(())
 }
 

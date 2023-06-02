@@ -9,6 +9,7 @@ use num_traits::FromPrimitive;
 use std::io::Cursor;
 use tokio_util::codec::Decoder;
 use tokio_util::codec::Encoder;
+use tracing::debug;
 
 #[derive(Default)]
 pub struct SofarCodec;
@@ -18,7 +19,7 @@ impl Decoder for SofarCodec {
     type Error = bincode::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        log::debug!("Trying to decode data ({:#?})", buf);
+        debug!("Trying to decode data ({:#?})", buf);
         let header_data_length: usize = 1 + 2 + 2 + 1 + 1 + 4;
         let footer_data_length: usize = 1 + 1;
 
@@ -27,7 +28,7 @@ impl Decoder for SofarCodec {
         }
 
         if buf.len() < header_data_length {
-            log::debug!("Too little data to read header ({:?})", buf.len());
+            debug!("Too little data to read header ({:?})", buf.len());
             return Ok(None);
         }
 
@@ -43,7 +44,7 @@ impl Decoder for SofarCodec {
         }
 
         if buf.len() < (header_data_length + message_length + footer_data_length) {
-            log::debug!("Waiting for more data ({:?})", buf.len());
+            debug!("Waiting for more data ({:?})", buf.len());
             return Ok(None);
         }
 
@@ -51,7 +52,7 @@ impl Decoder for SofarCodec {
             calc_checksum(&buf[1..header_data_length + message_length + footer_data_length - 2])
                 .unwrap_or(0);
 
-        log::debug!("Calculating checksum: {:?}", calculated_checksum);
+        debug!("Calculating checksum: {:?}", calculated_checksum);
 
         // swallow first byte
         buf.get_u8();
@@ -63,7 +64,7 @@ impl Decoder for SofarCodec {
             SofarMessageType::from_u16(message_type_bytes).ok_or(bincode::Error::new(
                 bincode::ErrorKind::Custom(format!("Unknown message type {}", message_type_bytes)),
             ))?;
-        log::debug!("Decoded message type: {:?}", message_type);
+        debug!("Decoded message type: {:?}", message_type);
 
         let message_number = buf.get_u8();
         let message_number_2 = buf.get_u8();
@@ -82,6 +83,8 @@ impl Decoder for SofarCodec {
                 bincode::deserialize(buf).map(IncomingMessageData::Unknown44)
             }
         }?;
+
+        debug!("Decoded payload: {:?}", data);
 
         buf.advance(message_length);
 
@@ -114,6 +117,8 @@ impl Encoder<SofarMessage<OutgoingMessageData>> for SofarCodec {
         item: SofarMessage<OutgoingMessageData>,
         buf: &mut BytesMut,
     ) -> Result<(), Self::Error> {
+        debug!("Payload to encode: {:?}", item);
+
         let response_type = match item.message_type {
             SofarMessageType::Data => 0x1210,
             SofarMessageType::Heartbeat => 0x1710,

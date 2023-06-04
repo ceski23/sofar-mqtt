@@ -2,9 +2,9 @@ use crate::{
     config::{Config, MQTT_CLIENT_ID},
     homeassistant::{Device, Entity, EntityType},
 };
+use anyhow::Context;
 use rumqttc::{AsyncClient, EventLoop, MqttOptions, QoS};
 use serde_json::Value;
-use std::error::Error;
 
 pub struct MqttPublisher {
     pub mqtt_client: AsyncClient,
@@ -30,7 +30,7 @@ impl MqttPublisher {
         }
     }
 
-    pub async fn publish_state(&mut self, entity: &EntityType) -> Result<(), Box<dyn Error>> {
+    pub async fn publish_state(&mut self, entity: &EntityType) -> anyhow::Result<()> {
         let (payload, name) = match entity {
             EntityType::EnergySensor { name, value } => (value.to_string(), name.to_string()),
             EntityType::PowerSensor { name, value } => (value.to_string(), name.to_string()),
@@ -50,7 +50,12 @@ impl MqttPublisher {
             )
             .await?;
 
-        self.event_loop.poll().await?;
+        self.event_loop.poll().await.with_context(|| {
+            format!(
+                "Error sending state for path: {}/state/{}",
+                self.prefix, name
+            )
+        })?;
         Ok(())
     }
 
@@ -58,7 +63,7 @@ impl MqttPublisher {
         &mut self,
         entity: &EntityType,
         device: &Device,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> anyhow::Result<()> {
         let (payload, name) = match entity {
             EntityType::EnergySensor { name, .. } => (
                 Entity::energy_sensor(name.to_string(), self.prefix.to_owned(), device),
@@ -91,11 +96,16 @@ impl MqttPublisher {
             )
             .await?;
 
-        self.event_loop.poll().await?;
+        self.event_loop.poll().await.with_context(|| {
+            format!(
+                "Error sending discovery for path: homeassistant/sensor/{}/{name}/config",
+                device.identifiers
+            )
+        })?;
         Ok(())
     }
 
-    pub async fn publish_attributes(&mut self, value: &Value) -> Result<(), Box<dyn Error>> {
+    pub async fn publish_attributes(&mut self, value: &Value) -> anyhow::Result<()> {
         let payload = match value {
             Value::String(a) => a.trim().to_owned(),
             a => a.to_string(),
@@ -110,7 +120,12 @@ impl MqttPublisher {
             )
             .await?;
 
-        self.event_loop.poll().await?;
+        self.event_loop.poll().await.with_context(|| {
+            format!(
+                "Error sending attributes for path: {}/attributes",
+                self.prefix
+            )
+        })?;
         Ok(())
     }
 }

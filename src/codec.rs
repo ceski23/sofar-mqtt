@@ -2,6 +2,7 @@ use crate::messages::IncomingMessageData;
 use crate::messages::OutgoingMessageData;
 use crate::messages::SofarMessage;
 use crate::messages::SofarMessageType;
+use anyhow::anyhow;
 use bytes::Buf;
 use bytes::BufMut;
 use bytes::BytesMut;
@@ -16,9 +17,9 @@ pub struct SofarCodec;
 
 impl Decoder for SofarCodec {
     type Item = SofarMessage<IncomingMessageData>;
-    type Error = bincode::Error;
+    type Error = anyhow::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> anyhow::Result<Option<Self::Item>, Self::Error> {
         debug!("Trying to decode data ({:#?})", buf);
         let header_data_length: usize = 1 + 2 + 2 + 1 + 1 + 4;
         let footer_data_length: usize = 1 + 1;
@@ -60,10 +61,8 @@ impl Decoder for SofarCodec {
         buf.get_u16_le();
 
         let message_type_bytes = buf.get_u16_le();
-        let message_type =
-            SofarMessageType::from_u16(message_type_bytes).ok_or(bincode::Error::new(
-                bincode::ErrorKind::Custom(format!("Unknown message type {}", message_type_bytes)),
-            ))?;
+        let message_type = SofarMessageType::from_u16(message_type_bytes)
+            .ok_or(anyhow!("Unknown message type {message_type_bytes}"))?;
         debug!("Decoded message type: {:?}", message_type);
 
         let message_number = buf.get_u8();
@@ -91,9 +90,7 @@ impl Decoder for SofarCodec {
         let checksum = buf.get_u8();
 
         if checksum != calculated_checksum {
-            return Err(bincode::Error::new(bincode::ErrorKind::Custom(
-                "Invalid checksum".to_string(),
-            )));
+            return Err(anyhow!("Invalid checksum {checksum}"));
         }
 
         // swallow last byte
@@ -116,7 +113,7 @@ impl Encoder<SofarMessage<OutgoingMessageData>> for SofarCodec {
         &mut self,
         item: SofarMessage<OutgoingMessageData>,
         buf: &mut BytesMut,
-    ) -> Result<(), Self::Error> {
+    ) -> anyhow::Result<(), Self::Error> {
         debug!("Payload to encode: {:?}", item);
 
         let response_type = match item.message_type {

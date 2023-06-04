@@ -18,11 +18,9 @@ use crate::{
     messages::{IncomingMessageData, SofarMessage},
     mqtt::MqttPublisher,
 };
+use anyhow::Context;
 use futures_util::{SinkExt, StreamExt};
-use std::{
-    error::Error,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::{
     net::{TcpListener, TcpStream},
     task,
@@ -31,22 +29,28 @@ use tokio_util::codec::Framed;
 use tracing::{error, info};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    dotenv::dotenv().ok();
+async fn main() -> anyhow::Result<()> {
+    dotenv::dotenv().context("Couldn't load env variables")?;
     logger::init_logger()?;
 
     info!("Starting sofar-mqtt v{}", env!("CARGO_PKG_VERSION"));
 
-    let config = serde_env::from_env::<Config>().unwrap();
+    let config = serde_env::from_env::<Config>()?;
     let listener = TcpListener::bind(format!("0.0.0.0:{0}", config.tcp_port)).await?;
     info!("Waiting for connections");
 
     loop {
-        let (socket, _connection) = listener.accept().await?;
+        let (mut socket, _connection) = listener.accept().await?;
         task::spawn(async move {
-            match process_socket(socket).await {
-                Ok(_) => {}
-                Err(err) => error!("Finished connection with error {:?}", err),
+            let result = process_socket(&mut socket).await.with_context(|| {
+                format!(
+                    "Finished connection to {} with error",
+                    &socket.peer_addr().unwrap(),
+                )
+            });
+
+            if let Err(err) = result {
+                error!("{err:?}")
             }
         });
     }
@@ -56,7 +60,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     skip_all,
     fields(ip = %stream.peer_addr().unwrap()),
 )]
-async fn process_socket(stream: TcpStream) -> Result<(), Box<dyn Error>> {
+async fn process_socket(stream: &mut TcpStream) -> anyhow::Result<()> {
     info!("Spawning connection handler");
 
     let mut inverter_ip: Option<String> = None;
@@ -102,29 +106,13 @@ async fn process_socket(stream: TcpStream) -> Result<(), Box<dyn Error>> {
 
                         mqtt_publisher
                             .publish_attributes(&serde_json::to_value(&attributes)?)
-                            .await
-                            .unwrap_or_else(|err| {
-                                error!("Error sending data to MQTT broker ({:?})", err)
-                            });
+                            .await?;
 
                         info!("Sending data ({:?})", entities);
 
                         for entity in entities {
-                            match mqtt_publisher.publish_discovery(&entity, &device).await {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    error!("Error sending data to MQTT broker ({:?})", err);
-                                    break;
-                                }
-                            }
-
-                            match mqtt_publisher.publish_state(&entity).await {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    error!("Error sending data to MQTT broker ({:?})", err);
-                                    break;
-                                }
-                            }
+                            mqtt_publisher.publish_discovery(&entity, &device).await?;
+                            mqtt_publisher.publish_state(&entity).await?;
                         }
 
                         mqtt_publisher.event_loop.poll().await?;

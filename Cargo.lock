@@ -633,6 +633,7 @@ dependencies = [
 name = "sofar-mqtt"
 version = "1.0.0"
 dependencies = [
+ "anyhow",
  "bincode",
  "bytes",
  "dotenv",

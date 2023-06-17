@@ -30,7 +30,7 @@ use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dotenv::dotenv().context("Couldn't load env variables")?;
+    dotenv::dotenv().ok();
     logger::init_logger()?;
 
     info!("Starting sofar-mqtt v{}", env!("CARGO_PKG_VERSION"));

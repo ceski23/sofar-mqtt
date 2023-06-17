@@ -25,16 +25,14 @@ jobs:
         with:
           command: test
 
-  build-and-push-image:
-    name: Build and release
+  release:
+    name: Release new version
     needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write # to be able to publish a GitHub release
       issues: write # to be able to comment on released issues
       pull-requests: write # to be able to comment on released pull requests
-      packages: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -51,13 +49,30 @@ jobs:
         id: semantic-release
         uses: cycjimmy/semantic-release-action@v3
         with:
+          semantic_version: 19.0.5
           extra_plugins: |
-            @semantic-release/changelog
-            @semantic-release/git
-            @semantic-release/exec
-            @semantic-release/github
+            @semantic-release/changelog@6.0.3
+            @semantic-release/git@10.0.1
+            @semantic-release/exec@6.0.3
+            @semantic-release/github@8.1.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      new_release_git_tag: ${{ steps.semantic-release.outputs.new_release_git_tag }}
+      new_release_version: ${{ steps.semantic-release.outputs.new_release_version }}
+
+  build:
+    name: Build Docker image
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.release.outputs.new_release_git_tag }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -79,14 +94,14 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: type=semver,pattern={{version}},value=${{ steps.semantic-release.outputs.new_release_version }}
+          tags: type=semver,pattern={{version}},value=${{ needs.release.outputs.new_release_version }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          platforms: linux/arm64/v8
+          platforms: linux/arm64,linux/x86_64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

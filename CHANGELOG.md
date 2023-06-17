@@ -1,3 +1,16 @@
+# [1.1.0](https://github.com/ceski23/sofar-mqtt/compare/v1.0.0...v1.1.0) (2023-06-17)
+
+
+### Bug Fixes
+
+* fix .env file loading ([678082d](https://github.com/ceski23/sofar-mqtt/commit/678082def2f62e04709878dd7a67959acfcfb6a6))
+
+
+### Features
+
+* improve error handling ([ea7e380](https://github.com/ceski23/sofar-mqtt/commit/ea7e380a15487bda0457a230557b87c2fc49f10d))
+* migrate logging from `log` to `tracing` ([8f6ae83](https://github.com/ceski23/sofar-mqtt/commit/8f6ae835910ddced2ae89e858ebbef9a51908127)), closes [#1](https://github.com/ceski23/sofar-mqtt/issues/1)
+
 # 1.0.0 (2023-06-01)
 
 
